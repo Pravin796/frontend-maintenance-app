@@ -41,3 +41,4 @@ For the mobile app to successfully communicate with your backend, the URL must b
 - **Do NOT use `localhost` or `127.0.0.1`**: On an Android emulator or a physical phone, `localhost` refers to the device itself, not your computer running the backend.
 - **For Android Emulator**: Use `http://10.0.2.2:<port>` (e.g., `http://10.0.2.2:8080/api`).
 - **For Physical Devices**: Use your computer's local IP address on the Wi-Fi network (e.g., `http://192.168.1.100:8080/api`). Both the computer and phone must be on the same network.
+# frontend-maintenance-app

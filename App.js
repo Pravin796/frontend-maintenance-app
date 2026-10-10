@@ -1,8 +1,38 @@
 import './global.css';
+import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, SafeAreaView } from 'react-native';
+import { Text, View, SafeAreaView, TouchableOpacity } from 'react-native';
+
+import LoginScreen from './screens/LoginScreen';
+import RegisterScreen from './screens/RegisterScreen';
+import DashboardScreen from './screens/DashboardScreen';
 
 export default function App() {
+  const [currentScreen, setCurrentScreen] = useState('welcome');
+
+  if (currentScreen === 'login') {
+    return (
+      <LoginScreen
+        onLogin={() => setCurrentScreen('dashboard')}
+        onNavigateRegister={() => setCurrentScreen('register')}
+        onBack={() => setCurrentScreen('welcome')}
+      />
+    );
+  }
+
+  if (currentScreen === 'register') {
+    return (
+      <RegisterScreen
+        onNavigateLogin={() => setCurrentScreen('login')}
+        onBack={() => setCurrentScreen('welcome')}
+      />
+    );
+  }
+
+  if (currentScreen === 'dashboard') {
+    return <DashboardScreen onLogout={() => setCurrentScreen('welcome')} />;
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <View className="flex-1 items-center justify-center p-6">
@@ -18,22 +48,20 @@ export default function App() {
           Manage maintenance and payments in one place.
         </Text>
 
-        <View className="w-full">
-          <View className="bg-white p-5 rounded-2xl flex-row items-center mb-4 shadow-sm border border-slate-100">
-            <View className="w-12 h-12 bg-indigo-100 rounded-xl mr-4" />
-            <View className="flex-1">
-              <Text className="text-slate-800 font-semibold text-lg">Maintenance</Text>
-              <Text className="text-slate-500 text-sm mt-1">Submit and track requests</Text>
-            </View>
-          </View>
+        <View className="w-full mt-2">
+          <TouchableOpacity
+            className="bg-blue-600 rounded-2xl py-4 items-center mb-4"
+            onPress={() => setCurrentScreen('login')}
+          >
+            <Text className="text-white font-bold text-lg">Login</Text>
+          </TouchableOpacity>
 
-          <View className="bg-white p-5 rounded-2xl flex-row items-center shadow-sm border border-slate-100">
-            <View className="w-12 h-12 bg-emerald-100 rounded-xl mr-4" />
-            <View className="flex-1">
-              <Text className="text-slate-800 font-semibold text-lg">Payments</Text>
-              <Text className="text-slate-500 text-sm mt-1">Secure rent & fees</Text>
-            </View>
-          </View>
+          <TouchableOpacity
+            className="bg-white border border-slate-200 rounded-2xl py-4 items-center"
+            onPress={() => setCurrentScreen('register')}
+          >
+            <Text className="text-slate-700 font-bold text-lg">Create an Account</Text>
+          </TouchableOpacity>
         </View>
 
         <StatusBar style="dark" />
