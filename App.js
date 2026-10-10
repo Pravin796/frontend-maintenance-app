@@ -1,19 +1,62 @@
 import './global.css';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, SafeAreaView, TouchableOpacity } from 'react-native';
+import { Text, View, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
 
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import DashboardScreen from './screens/DashboardScreen';
+import { authService } from './src/services/authService';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('welcome');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const token = await authService.getStoredToken();
+        const user = await authService.getCurrentUser();
+        if (token && user) {
+          setCurrentUser(user);
+          setCurrentScreen('dashboard');
+        }
+      } catch {
+        // If restoration fails, stay on welcome screen
+      } finally {
+        setIsRestoringSession(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // Continue clearing local state
+    }
+    setCurrentUser(null);
+    setCurrentScreen('welcome');
+  };
+
+  if (isRestoringSession) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <ActivityIndicator size="large" color="#2563eb" />
+      </SafeAreaView>
+    );
+  }
 
   if (currentScreen === 'login') {
     return (
       <LoginScreen
-        onLogin={() => setCurrentScreen('dashboard')}
+        onLogin={(userData) => {
+          setCurrentUser(userData);
+          setCurrentScreen('dashboard');
+        }}
         onNavigateRegister={() => setCurrentScreen('register')}
         onBack={() => setCurrentScreen('welcome')}
       />
@@ -30,7 +73,7 @@ export default function App() {
   }
 
   if (currentScreen === 'dashboard') {
-    return <DashboardScreen onLogout={() => setCurrentScreen('welcome')} />;
+    return <DashboardScreen user={currentUser} onLogout={handleLogout} />;
   }
 
   return (

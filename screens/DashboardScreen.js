@@ -2,13 +2,26 @@ import React from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-export default function DashboardScreen({ onLogout }) {
+export default function DashboardScreen({ user, onLogout }) {
+  const roleTitle = user?.role === 'ADMIN' ? 'Admin Dashboard' : 'Resident Dashboard';
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
         <View className="mt-8 mb-8">
-          <Text className="text-3xl font-extrabold text-slate-900 mb-2">Welcome</Text>
-          <Text className="text-base text-slate-500">Temporary Resident Dashboard</Text>
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-3xl font-extrabold text-slate-900">Welcome</Text>
+            {user?.role ? (
+              <View className={`px-3 py-1 rounded-full ${user.role === 'ADMIN' ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                <Text className={`font-bold text-xs ${user.role === 'ADMIN' ? 'text-purple-700' : 'text-blue-700'}`}>
+                  {user.role}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text className="text-base text-slate-500">
+            {roleTitle} {user?.roomNumber ? `• Room ${user.roomNumber}` : ''}
+          </Text>
         </View>
 
         <View className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 mb-6">

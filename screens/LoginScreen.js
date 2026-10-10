@@ -1,19 +1,51 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { authService } from '../src/services/authService';
 
 export default function LoginScreen({ onLogin, onNavigateRegister, onBack }) {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (!mobile.trim() || !password.trim()) {
+  const handleLogin = async () => {
+    if (loading) return;
+
+    const trimmedMobile = mobile.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedMobile || !trimmedPassword) {
       setError('Please enter both mobile number and password.');
       return;
     }
+
     setError('');
-    // No real authentication yet. Just navigate to dashboard.
-    onLogin();
+    setLoading(true);
+
+    try {
+      const data = await authService.login({
+        mobileNumber: trimmedMobile,
+        password: trimmedPassword,
+      });
+
+      if (data && data.token) {
+        onLogin(data);
+      } else {
+        setError('Login failed: Authentication token was not returned.');
+      }
+    } catch (err) {
+      if (!err.response) {
+        setError('Unable to connect to server. Please check your network connection.');
+      } else if (err.response.status === 401) {
+        setError(err.response.data?.message || 'Invalid mobile number or password.');
+      } else if (err.response.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError('Server error. Please try again later.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -44,6 +76,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onBack }) {
               value={mobile}
               onChangeText={setMobile}
               autoCapitalize="none"
+              editable={!loading}
             />
           </View>
 
@@ -55,19 +88,25 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onBack }) {
               secureTextEntry
               value={password}
               onChangeText={setPassword}
+              editable={!loading}
             />
           </View>
 
           <TouchableOpacity 
-            className="bg-blue-600 rounded-2xl py-4 items-center mb-4"
+            className={`bg-blue-600 rounded-2xl py-4 items-center mb-4 ${loading ? 'opacity-70' : ''}`}
             onPress={handleLogin}
+            disabled={loading}
           >
-            <Text className="text-white font-bold text-lg">Login</Text>
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text className="text-white font-bold text-lg">Login</Text>
+            )}
           </TouchableOpacity>
 
           <View className="flex-row justify-center mt-2 mb-4">
             <Text className="text-slate-500">Don't have an account? </Text>
-            <TouchableOpacity onPress={onNavigateRegister}>
+            <TouchableOpacity onPress={onNavigateRegister} disabled={loading}>
               <Text className="text-blue-600 font-bold">Register</Text>
             </TouchableOpacity>
           </View>
@@ -75,6 +114,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onBack }) {
           <TouchableOpacity 
             className="items-center mt-2"
             onPress={onBack}
+            disabled={loading}
           >
             <Text className="text-slate-500 font-semibold">Back to Welcome</Text>
           </TouchableOpacity>
