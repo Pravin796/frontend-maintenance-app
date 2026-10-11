@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-export default function DashboardScreen({ user, onLogout }) {
+export default function DashboardScreen({ user, onLogout, onChangePassword }) {
   const roleTitle = user?.role === 'ADMIN' ? 'Admin Dashboard' : 'Resident Dashboard';
 
   return (
@@ -55,6 +55,15 @@ export default function DashboardScreen({ user, onLogout }) {
         </View>
 
         <View className="mt-auto">
+          {onChangePassword ? (
+            <TouchableOpacity
+              className="bg-blue-600 rounded-2xl py-4 items-center mb-3"
+              onPress={onChangePassword}
+            >
+              <Text className="text-white font-bold text-lg">Change Password</Text>
+            </TouchableOpacity>
+          ) : null}
+
           <TouchableOpacity
             className="bg-white border border-slate-200 rounded-2xl py-4 items-center"
             onPress={onLogout}

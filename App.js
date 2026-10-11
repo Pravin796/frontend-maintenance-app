@@ -1,11 +1,12 @@
 import './global.css';
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text, View, SafeAreaView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import DashboardScreen from './screens/DashboardScreen';
+import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import { authService } from './src/services/authService';
 
 export default function App() {
@@ -20,7 +21,11 @@ export default function App() {
         const user = await authService.getCurrentUser();
         if (token && user) {
           setCurrentUser(user);
-          setCurrentScreen('dashboard');
+          if (user.mustChangePassword) {
+            setCurrentScreen('changePassword');
+          } else {
+            setCurrentScreen('dashboard');
+          }
         }
       } catch {
         // If restoration fails, stay on welcome screen
@@ -54,10 +59,22 @@ export default function App() {
     return (
       <LoginScreen
         onLogin={(userData) => {
-          setCurrentUser(userData);
-          setCurrentScreen('dashboard');
+          const user = {
+            userId: userData.userId,
+            roomNumber: userData.roomNumber,
+            mobileNumber: userData.mobileNumber,
+            role: userData.role,
+            mustChangePassword: userData.mustChangePassword,
+          };
+          setCurrentUser(user);
+          if (userData.mustChangePassword) {
+            setCurrentScreen('changePassword');
+          } else {
+            setCurrentScreen('dashboard');
+          }
         }}
         onNavigateRegister={() => setCurrentScreen('register')}
+        onNavigateChangePassword={() => setCurrentScreen('changePassword')}
         onBack={() => setCurrentScreen('welcome')}
       />
     );
@@ -72,19 +89,53 @@ export default function App() {
     );
   }
 
+  if (currentScreen === 'changePassword') {
+    return (
+      <ChangePasswordScreen
+        user={currentUser}
+        isForced={Boolean(currentUser?.mustChangePassword)}
+        onSuccess={(updatedUser) => {
+          const nextUser = updatedUser || (currentUser ? { ...currentUser, mustChangePassword: false } : null);
+          setCurrentUser(nextUser);
+          if (nextUser) {
+            setCurrentScreen('dashboard');
+          } else {
+            setCurrentScreen('login');
+          }
+        }}
+        onCancel={() => {
+          if (currentUser && !currentUser.mustChangePassword) {
+            setCurrentScreen('dashboard');
+          } else {
+            setCurrentScreen('login');
+          }
+        }}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   if (currentScreen === 'dashboard') {
-    return <DashboardScreen user={currentUser} onLogout={handleLogout} />;
+    return (
+      <DashboardScreen
+        user={currentUser}
+        onLogout={handleLogout}
+        onChangePassword={() => setCurrentScreen('changePassword')}
+      />
+    );
   }
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <View className="flex-1 items-center justify-center p-6">
-        <View className="w-24 h-24 bg-blue-600 rounded-3xl items-center justify-center mb-8 shadow-sm">
-          <Text className="text-white text-4xl font-bold">RM</Text>
-        </View>
+        <Image
+          source={require('./assets/icon.png')}
+          className="w-24 h-24 rounded-3xl mb-8 shadow-sm"
+          resizeMode="cover"
+        />
 
         <Text className="text-3xl font-extrabold text-slate-900 text-center mb-3">
-          Residency Maintenance
+          Radhika Maintenance
         </Text>
 
         <Text className="text-base text-slate-500 text-center mb-10 leading-6 px-4">

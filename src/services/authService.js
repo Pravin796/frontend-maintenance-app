@@ -37,5 +37,27 @@ export const authService = {
   getStoredToken: async () => {
     return await tokenStorage.getToken();
   },
+
+  changePassword: async ({ currentPassword, newPassword, confirmPassword }) => {
+    const response = await api.post('/auth/change-password', {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    });
+    const currentUser = await tokenStorage.getUser();
+    if (currentUser) {
+      const updatedUser = {
+        ...currentUser,
+        mustChangePassword: false,
+      };
+      await tokenStorage.saveUser(updatedUser);
+    }
+    return response.data;
+  },
+
+  updateStoredUser: async (updatedUser) => {
+    await tokenStorage.saveUser(updatedUser);
+    return updatedUser;
+  },
 };
 

@@ -1,12 +1,46 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../src/services/authService';
 
-export default function LoginScreen({ onLogin, onNavigateRegister, onBack }) {
+export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateChangePassword, onBack }) {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handleLogin = async () => {
     if (loading) return;
@@ -49,77 +83,113 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onBack }) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1 bg-slate-50"
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
-        <View className="items-center mb-10">
-          <View className="w-20 h-20 bg-blue-600 rounded-3xl items-center justify-center mb-6 shadow-sm">
-            <Text className="text-white text-3xl font-bold">RM</Text>
-          </View>
-          <Text className="text-3xl font-extrabold text-slate-900 mb-2">Welcome Back</Text>
-          <Text className="text-base text-slate-500 text-center">Login to your account</Text>
-        </View>
-
-        <View className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          {error ? (
-            <Text className="text-red-500 mb-4 text-center">{error}</Text>
-          ) : null}
-
-          <View className="mb-4">
-            <Text className="text-slate-700 font-semibold mb-2 ml-1">Mobile Number</Text>
-            <TextInput
-              className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-900 text-base"
-              placeholder="Enter your mobile number"
-              keyboardType="phone-pad"
-              value={mobile}
-              onChangeText={setMobile}
-              autoCapitalize="none"
-              editable={!loading}
-            />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={{
+            flexGrow: 1,
+            padding: 24,
+            paddingBottom: keyboardHeight > 0 ? keyboardHeight + 60 : 30,
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="items-center mb-10 mt-32">
+            <Text className="text-3xl font-extrabold text-slate-900 mb-2">Welcome Back</Text>
+            <Text className="text-base text-slate-500 text-center">Login to your account</Text>
           </View>
 
-          <View className="mb-6">
-            <Text className="text-slate-700 font-semibold mb-2 ml-1">Password</Text>
-            <TextInput
-              className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-900 text-base"
-              placeholder="Enter your password"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              editable={!loading}
-            />
-          </View>
+          <View className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            {error ? (
+              <Text className="text-red-500 mb-4 text-center">{error}</Text>
+            ) : null}
 
-          <TouchableOpacity 
-            className={`bg-blue-600 rounded-2xl py-4 items-center mb-4 ${loading ? 'opacity-70' : ''}`}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#ffffff" />
+            <View className="mb-4">
+              <Text className="text-slate-700 font-semibold mb-2 ml-1">Mobile Number</Text>
+              <TextInput
+                className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-900 text-base"
+                placeholder="Enter your mobile number"
+                keyboardType="phone-pad"
+                value={mobile}
+                onChangeText={setMobile}
+                autoCapitalize="none"
+                editable={!loading}
+              />
+            </View>
+
+            <View className="mb-2">
+              <Text className="text-slate-700 font-semibold mb-2 ml-1">Password</Text>
+              <View className="relative justify-center">
+                <TextInput
+                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-12 text-slate-900 text-base"
+                  placeholder="Enter your password"
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!loading}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 150);
+                  }}
+                />
+                <TouchableOpacity
+                  className="absolute right-4"
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={22}
+                    color="#64748b"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {onNavigateChangePassword ? (
+              <View className="flex-row justify-end mb-6">
+                <TouchableOpacity onPress={onNavigateChangePassword} disabled={loading}>
+                  <Text className="text-blue-600 font-semibold text-sm">Reset / Change Password</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
-              <Text className="text-white font-bold text-lg">Login</Text>
+              <View className="mb-6" />
             )}
-          </TouchableOpacity>
 
-          <View className="flex-row justify-center mt-2 mb-4">
-            <Text className="text-slate-500">Don't have an account? </Text>
-            <TouchableOpacity onPress={onNavigateRegister} disabled={loading}>
-              <Text className="text-blue-600 font-bold">Register</Text>
+            <TouchableOpacity
+              className={`bg-blue-600 rounded-2xl py-4 items-center mb-4 ${loading ? 'opacity-70' : ''}`}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text className="text-white font-bold text-lg">Login</Text>
+              )}
+            </TouchableOpacity>
+
+            <View className="flex-row justify-center mt-2 mb-4">
+              <Text className="text-slate-500">Don{"'"}t have an account? </Text>
+              <TouchableOpacity onPress={onNavigateRegister} disabled={loading}>
+                <Text className="text-blue-600 font-bold">Register</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              className="items-center mt-2"
+              onPress={onBack}
+              disabled={loading}
+            >
+              <Text className="text-slate-500 font-semibold">Back to Welcome</Text>
             </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity 
-            className="items-center mt-2"
-            onPress={onBack}
-            disabled={loading}
-          >
-            <Text className="text-slate-500 font-semibold">Back to Welcome</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }

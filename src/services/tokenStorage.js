@@ -60,6 +60,25 @@ export const tokenStorage = {
     }
   },
 
+  saveUser: async (user) => {
+    const available = await isSecureStoreAvailable();
+    const userString = user ? JSON.stringify(user) : null;
+
+    if (available) {
+      if (userString) {
+        await SecureStore.setItemAsync(USER_KEY, userString);
+      } else {
+        await SecureStore.deleteItemAsync(USER_KEY);
+      }
+    } else {
+      if (userString) {
+        memoryStorage[USER_KEY] = userString;
+      } else {
+        delete memoryStorage[USER_KEY];
+      }
+    }
+  },
+
   clearAuth: async () => {
     const available = await isSecureStoreAvailable();
     if (available) {
