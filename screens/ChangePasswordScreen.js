@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,10 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback,
   Keyboard,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from '../src/services/authService';
 
 export default function ChangePasswordScreen({
@@ -32,27 +34,7 @@ export default function ChangePasswordScreen({
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollViewRef = useRef(null);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-      }
-    );
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   const handleChangePassword = async () => {
     if (loading) return;
@@ -93,7 +75,7 @@ export default function ChangePasswordScreen({
 
       const updatedUser = user ? { ...user, mustChangePassword: false } : null;
 
-      // Give user brief visual feedback before transitioning
+      // Brief visual feedback before transitioning
       setTimeout(() => {
         if (onSuccess) {
           onSuccess(updatedUser);
@@ -120,7 +102,7 @@ export default function ChangePasswordScreen({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-slate-50"
+      className="flex-1 bg-[#FAF9F6]"
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView
@@ -128,100 +110,128 @@ export default function ChangePasswordScreen({
           contentContainerStyle={{
             flexGrow: 1,
             padding: 24,
-            paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 40,
+            paddingBottom: 40,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="items-center mb-8 mt-32">
-            {/* <View
-            className={`w-20 h-20 rounded-3xl items-center justify-center mb-4 shadow-sm ${
-              isForced ? 'bg-amber-500' : 'bg-blue-600'
-            }`}
-          >
-            <Text className="text-white text-3xl font-bold">
-              {isForced ? '!' : 'CP'}
+          {/* Header Section */}
+          <View className="items-center mt-6 mb-7">
+            <Image
+              source={require('../assets/icon.png')}
+              style={{
+                width: 84,
+                height: 84,
+                borderRadius: 24,
+                marginBottom: 16,
+                shadowColor: '#F57C00',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.25,
+                shadowRadius: 16,
+              }}
+              resizeMode="contain"
+            />
+
+            <Text className="text-3xl font-extrabold text-[#1F2937] mb-1.5 text-center px-2">
+              {isForced ? 'Password Required' : 'Change Password'}
             </Text>
-          </View> */}
-            <Text className="text-3xl font-extrabold text-slate-900 mb-2 text-center">
-              {isForced ? 'Password Change Required' : 'Change Password'}
-            </Text>
-            <Text className="text-base text-slate-500 text-center px-4">
+            <Text className="text-sm font-medium text-gray-500 text-center px-4">
               {isForced
                 ? 'You must change your temporary password before accessing your dashboard.'
                 : 'Enter your current password and choose a new password.'}
             </Text>
           </View>
 
-          <View className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 mb-6">
+          {/* Form Card */}
+          <View
+            className="bg-white p-6 rounded-3xl border border-gray-100"
+            style={{
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 2,
+            }}
+          >
             {error ? (
-              <View className="bg-red-50 border border-red-200 p-4 rounded-xl mb-4">
-                <Text className="text-red-600 text-center">{error}</Text>
+              <View className="bg-red-50 border border-red-200 p-3.5 rounded-2xl mb-4">
+                <Text className="text-red-600 text-center text-sm font-medium">{error}</Text>
               </View>
             ) : null}
 
             {successMessage ? (
-              <View className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl mb-4">
-                <Text className="text-emerald-700 text-center font-medium">
+              <View className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl mb-4">
+                <Text className="text-emerald-700 text-center text-sm font-medium">
                   {successMessage}
                 </Text>
               </View>
             ) : null}
 
             {/* Current Password Field */}
-            <View className="mb-4">
-              <Text className="text-slate-700 font-semibold mb-2 ml-1">Current Password</Text>
-              <View className="relative justify-center">
-                <TextInput
-                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-12 text-slate-900 text-base"
-                  placeholder="Enter current password"
-                  secureTextEntry={!showCurrentPassword}
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  editable={!loading}
-                  autoCapitalize="none"
-                />
+            <View className="mb-3.5">
+              <View className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 flex-row items-center">
+                <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={{ marginRight: 12 }} />
+                <View className="flex-1">
+                  <Text className="text-[11px] font-semibold text-gray-400 mb-0.5">Current Password</Text>
+                  <TextInput
+                    className="text-gray-900 text-sm font-medium p-0"
+                    placeholder="Enter current password"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showCurrentPassword}
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    editable={!loading}
+                    autoCapitalize="none"
+                    onFocus={() => {
+                      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                    }}
+                  />
+                </View>
                 <TouchableOpacity
-                  className="absolute right-4"
                   onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  className="pl-2"
                 >
                   <Ionicons
                     name={showCurrentPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={22}
-                    color="#64748b"
+                    size={20}
+                    color="#9CA3AF"
                   />
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* New Password Field */}
-            <View className="mb-4">
-              <Text className="text-slate-700 font-semibold mb-2 ml-1">New Password</Text>
-              <View className="relative justify-center">
-                <TextInput
-                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-12 text-slate-900 text-base"
-                  placeholder="Enter new password (min 6 characters)"
-                  secureTextEntry={!showNewPassword}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  editable={!loading}
-                  autoCapitalize="none"
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollViewRef.current?.scrollTo({ y: 120, animated: true });
-                    }, 150);
-                  }}
-                />
+            <View className="mb-3.5">
+              <View className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 flex-row items-center">
+                <Ionicons name="key-outline" size={20} color="#9CA3AF" style={{ marginRight: 12 }} />
+                <View className="flex-1">
+                  <Text className="text-[11px] font-semibold text-gray-400 mb-0.5">New Password</Text>
+                  <TextInput
+                    className="text-gray-900 text-sm font-medium p-0"
+                    placeholder="Min 6 characters"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showNewPassword}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    editable={!loading}
+                    autoCapitalize="none"
+                    onFocus={() => {
+                      setTimeout(() => {
+                        scrollViewRef.current?.scrollTo({ y: 100, animated: true });
+                      }, 100);
+                    }}
+                  />
+                </View>
                 <TouchableOpacity
-                  className="absolute right-4"
                   onPress={() => setShowNewPassword(!showNewPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  className="pl-2"
                 >
                   <Ionicons
                     name={showNewPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={22}
-                    color="#64748b"
+                    size={20}
+                    color="#9CA3AF"
                   />
                 </TouchableOpacity>
               </View>
@@ -229,31 +239,35 @@ export default function ChangePasswordScreen({
 
             {/* Confirm Password Field */}
             <View className="mb-6">
-              <Text className="text-slate-700 font-semibold mb-2 ml-1">Confirm New Password</Text>
-              <View className="relative justify-center">
-                <TextInput
-                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-12 text-slate-900 text-base"
-                  placeholder="Re-enter new password"
-                  secureTextEntry={!showConfirmPassword}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  editable={!loading}
-                  autoCapitalize="none"
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollViewRef.current?.scrollToEnd({ animated: true });
-                    }, 150);
-                  }}
-                />
+              <View className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 flex-row items-center">
+                <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={{ marginRight: 12 }} />
+                <View className="flex-1">
+                  <Text className="text-[11px] font-semibold text-gray-400 mb-0.5">Confirm New Password</Text>
+                  <TextInput
+                    className="text-gray-900 text-sm font-medium p-0"
+                    placeholder="Re-enter new password"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    editable={!loading}
+                    autoCapitalize="none"
+                    onFocus={() => {
+                      setTimeout(() => {
+                        scrollViewRef.current?.scrollTo({ y: 160, animated: true });
+                      }, 100);
+                    }}
+                  />
+                </View>
                 <TouchableOpacity
-                  className="absolute right-4"
                   onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  className="pl-2"
                 >
                   <Ionicons
                     name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={22}
-                    color="#64748b"
+                    size={20}
+                    color="#9CA3AF"
                   />
                 </TouchableOpacity>
               </View>
@@ -261,41 +275,65 @@ export default function ChangePasswordScreen({
 
             {/* Submit Button */}
             <TouchableOpacity
-              className={`bg-blue-600 rounded-2xl py-4 items-center mb-3 ${loading ? 'opacity-70' : ''
-                }`}
+              activeOpacity={0.88}
+              className={`rounded-2xl overflow-hidden mb-4 ${loading ? 'opacity-70' : ''}`}
               onPress={handleChangePassword}
               disabled={loading}
+              style={{
+                shadowColor: '#F57C00',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.3,
+                shadowRadius: 12,
+                elevation: 6,
+              }}
             >
-              {loading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text className="text-white font-bold text-lg">
-                  {isForced ? 'Update Password & Continue' : 'Update Password'}
-                </Text>
-              )}
+              <LinearGradient
+                colors={['#FF8A00', '#F57C00', '#E65100']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 20,
+                  width: '100%',
+                }}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <View className="flex-row items-center justify-center">
+                    <Text className="text-white font-bold text-base mr-2">
+                      {isForced ? 'Update Password & Continue' : 'Update Password'}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={18} color="#ffffff" />
+                  </View>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
 
-            {/* Voluntary Cancel / Back Button (only if not forced) */}
+            {/* Cancel / Back Button */}
             {!isForced && onCancel ? (
               <TouchableOpacity
-                className="items-center py-3"
+                className="items-center py-2"
                 onPress={onCancel}
                 disabled={loading}
               >
-                <Text className="text-slate-600 font-semibold">
+                <Text className="text-gray-400 font-semibold text-sm">
                   {user ? 'Cancel' : 'Back to Login'}
                 </Text>
               </TouchableOpacity>
             ) : null}
 
-            {/* Logout Button (if forced, allow user to log out instead of getting trapped) */}
+            {/* Logout Button (if forced) */}
             {isForced && onLogout ? (
               <TouchableOpacity
-                className="items-center py-3"
+                className="items-center py-2"
                 onPress={onLogout}
                 disabled={loading}
               >
-                <Text className="text-slate-500 font-semibold">Log Out</Text>
+                <Text className="text-gray-400 font-semibold text-sm">Log Out</Text>
               </TouchableOpacity>
             ) : null}
           </View>
