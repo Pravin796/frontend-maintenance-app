@@ -11,11 +11,13 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Dimensions,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import PrimaryButton from '../src/components/PrimaryButton';
 import { authService } from '../src/services/authService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -190,50 +192,21 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                 paddingTop: Platform.OS === 'ios' ? 24 : 16,
               }}
             >
-              {/* App Icon Tile */}
-              <View
+              {/* App Icon */}
+              <Image
+                source={require('../assets/icon.png')}
                 style={{
-                  width: 88,
-                  height: 88,
-                  borderRadius: 26,
-                  overflow: 'hidden',
+                  width: 86,
+                  height: 86,
+                  borderRadius: 24,
                   marginBottom: 16,
-                  shadowColor: '#B45309',
-                  shadowOffset: { width: 0, height: 10 },
-                  shadowOpacity: 0.35,
-                  shadowRadius: 18,
-                  elevation: 10,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 10,
                 }}
-              >
-                <LinearGradient
-                  colors={['#FFB74D', '#FFA726', '#FF9800', '#F57C00']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {/* Glass / Gloss shine on upper half */}
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 42,
-                      backgroundColor: 'rgba(255, 255, 255, 0.22)',
-                      borderTopLeftRadius: 26,
-                      borderTopRightRadius: 26,
-                    }}
-                  />
-
-                  {/* House icon */}
-                  <Ionicons name="home" size={46} color="#FFFFFF" />
-                </LinearGradient>
-              </View>
+                resizeMode="contain"
+              />
 
               {/* Title */}
               <Text
@@ -323,7 +296,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                   style={{
                     fontSize: 13,
                     fontWeight: '600',
-                    color: '#334155',
+                    color: '#1F2937',
                     marginBottom: 2,
                   }}
                 >
@@ -331,7 +304,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                 </Text>
                 <TextInput
                   style={{
-                    color: '#0F172A',
+                    color: '#1F2937',
                     fontSize: 14.5,
                     fontWeight: '500',
                     padding: 0,
@@ -380,7 +353,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                   style={{
                     fontSize: 13,
                     fontWeight: '600',
-                    color: '#334155',
+                    color: '#1F2937',
                     marginBottom: 2,
                   }}
                 >
@@ -388,7 +361,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                 </Text>
                 <TextInput
                   style={{
-                    color: '#0F172A',
+                    color: '#1F2937',
                     fontSize: 14.5,
                     fontWeight: '500',
                     padding: 0,
@@ -440,7 +413,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                     width: 21,
                     height: 21,
                     borderRadius: 5,
-                    backgroundColor: rememberMe ? '#F97316' : '#FFFFFF',
+                    backgroundColor: rememberMe ? '#F57C00' : '#FFFFFF',
                     borderWidth: rememberMe ? 0 : 1.5,
                     borderColor: '#CBD5E1',
                     alignItems: 'center',
@@ -450,7 +423,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                 >
                   {rememberMe && <Ionicons name="checkmark" size={15} color="#FFFFFF" />}
                 </View>
-                <Text style={{ fontSize: 13.5, fontWeight: '500', color: '#475569' }}>
+                <Text style={{ fontSize: 13.5, fontWeight: '500', color: '#1F2937' }}>
                   Remember me
                 </Text>
               </TouchableOpacity>
@@ -461,61 +434,19 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                 disabled={loading}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={{ fontSize: 13.5, fontWeight: '600', color: '#F97316' }}>
+                <Text style={{ fontSize: 13.5, fontWeight: '600', color: '#F57C00' }}>
                   Forgot Password?
                 </Text>
               </TouchableOpacity>
             </View>
 
             {/* Primary Login Button */}
-            <TouchableOpacity
-              activeOpacity={0.88}
+            <PrimaryButton
+              title="Login"
               onPress={handleLogin}
-              disabled={loading}
-              style={{
-                borderRadius: 28,
-                overflow: 'hidden',
-                shadowColor: '#F97316',
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.38,
-                shadowRadius: 16,
-                elevation: 6,
-                opacity: loading ? 0.75 : 1,
-              }}
-            >
-              <LinearGradient
-                colors={['#FB923C', '#F97316', '#EA580C']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: 15,
-                  paddingHorizontal: 24,
-                  width: '100%',
-                }}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text
-                      style={{
-                        color: '#FFFFFF',
-                        fontWeight: '700',
-                        fontSize: 17,
-                        marginRight: 8,
-                        letterSpacing: 0.2,
-                      }}
-                    >
-                      Login
-                    </Text>
-                    <Ionicons name="arrow-forward" size={19} color="#FFFFFF" />
-                  </View>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+              loading={loading}
+              iconName="arrow-forward"
+            />
 
             {/* OR Divider */}
             <View
@@ -556,7 +487,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                 disabled={loading}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={{ color: '#F97316', fontWeight: '700', fontSize: 14 }}>
+                <Text style={{ color: '#F57C00', fontWeight: '700', fontSize: 14 }}>
                   Register
                 </Text>
               </TouchableOpacity>
