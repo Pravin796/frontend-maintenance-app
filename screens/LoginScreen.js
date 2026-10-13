@@ -1,10 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
   ScrollView,
   Platform,
   ActivityIndicator,
@@ -30,6 +29,42 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
+
+  // Refs to track each input's Y position inside the ScrollView
+  const mobileInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+  const inputPositions = useRef({});
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e) => {
+      setKeyboardPadding(e.endCoordinates.height);
+    };
+    const onHide = () => {
+      setKeyboardPadding(0);
+    };
+
+    const subShow = Keyboard.addListener(showEvent, onShow);
+    const subHide = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, []);
+
+  const scrollToInput = useCallback((fieldName) => {
+    // Short delay to let keyboard animation start and layout settle
+    setTimeout(() => {
+      const yPos = inputPositions.current[fieldName];
+      if (yPos != null && scrollViewRef.current) {
+        // Scroll so the input is roughly in the upper-middle of the visible area
+        scrollViewRef.current.scrollTo({ y: Math.max(0, yPos - 200), animated: true });
+      }
+    }, 300);
+  }, []);
 
   const handleLogin = async () => {
     if (loading) return;
@@ -72,15 +107,16 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: '#FFFFFF' }}
-    >
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <StatusBar style="light" />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView
           ref={scrollViewRef}
-          contentContainerStyle={{ flexGrow: 1, backgroundColor: '#FFFFFF', paddingBottom: 40 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            backgroundColor: '#FFFFFF',
+            paddingBottom: Math.max(40, keyboardPadding + 20),
+          }}
           keyboardShouldPersistTaps="handled"
           bounces={false}
           showsVerticalScrollIndicator={false}
@@ -268,6 +304,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
 
             {/* Mobile Number Input */}
             <View
+              onLayout={(e) => { inputPositions.current.mobile = e.nativeEvent.layout.y + 240; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderColor: '#E8ECF2',
@@ -303,6 +340,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                   Mobile Number
                 </Text>
                 <TextInput
+                  ref={mobileInputRef}
                   style={{
                     color: '#1F2937',
                     fontSize: 14.5,
@@ -316,15 +354,14 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                   onChangeText={setMobile}
                   autoCapitalize="none"
                   editable={!loading}
-                  onFocus={() => {
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                  }}
+                  onFocus={() => scrollToInput('mobile')}
                 />
               </View>
             </View>
 
             {/* Password Input */}
             <View
+              onLayout={(e) => { inputPositions.current.password = e.nativeEvent.layout.y + 240; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderColor: '#E8ECF2',
@@ -360,6 +397,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                   Password
                 </Text>
                 <TextInput
+                  ref={passwordInputRef}
                   style={{
                     color: '#1F2937',
                     fontSize: 14.5,
@@ -372,11 +410,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                   value={password}
                   onChangeText={setPassword}
                   editable={!loading}
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollViewRef.current?.scrollTo({ y: 60, animated: true });
-                    }, 100);
-                  }}
+                  onFocus={() => scrollToInput('password')}
                 />
               </View>
               <TouchableOpacity
@@ -495,6 +529,6 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

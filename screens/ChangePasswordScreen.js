@@ -1,10 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
   ScrollView,
   Platform,
   ActivityIndicator,
@@ -40,6 +39,33 @@ export default function ChangePasswordScreen({
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
+  const inputPositions = useRef({});
+  const formCardY = useRef(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e) => setKeyboardPadding(e.endCoordinates.height);
+    const onHide = () => setKeyboardPadding(0);
+
+    const subShow = Keyboard.addListener(showEvent, onShow);
+    const subHide = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, []);
+
+  const scrollToInput = useCallback((fieldName) => {
+    setTimeout(() => {
+      const yPos = inputPositions.current[fieldName];
+      if (yPos != null && scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ y: Math.max(0, yPos - 180), animated: true });
+      }
+    }, 300);
+  }, []);
 
   const handleBackAction = () => {
     if (isForced && onLogout) {
@@ -117,10 +143,7 @@ export default function ChangePasswordScreen({
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: '#FAF9F6' }}
-    >
+    <View style={{ flex: 1, backgroundColor: '#FAF9F6' }}>
       <StatusBar style="light" />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView
@@ -128,7 +151,7 @@ export default function ChangePasswordScreen({
           contentContainerStyle={{
             flexGrow: 1,
             backgroundColor: '#FAF9F6',
-            paddingBottom: 36,
+            paddingBottom: Math.max(36, keyboardPadding + 20),
           }}
           keyboardShouldPersistTaps="handled"
           bounces={false}
@@ -184,6 +207,7 @@ export default function ChangePasswordScreen({
 
           {/* Form Card */}
           <View
+            onLayout={(e) => { formCardY.current = e.nativeEvent.layout.y; }}
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: 26,
@@ -245,6 +269,7 @@ export default function ChangePasswordScreen({
 
             {/* Current Password Field */}
             <View
+              onLayout={(e) => { inputPositions.current.currentPassword = formCardY.current + e.nativeEvent.layout.y; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
@@ -276,9 +301,7 @@ export default function ChangePasswordScreen({
                   onChangeText={setCurrentPassword}
                   editable={!loading}
                   autoCapitalize="none"
-                  onFocus={() => {
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                  }}
+                  onFocus={() => scrollToInput('currentPassword')}
                 />
               </View>
               <TouchableOpacity
@@ -296,6 +319,7 @@ export default function ChangePasswordScreen({
 
             {/* New Password Field */}
             <View
+              onLayout={(e) => { inputPositions.current.newPassword = formCardY.current + e.nativeEvent.layout.y; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
@@ -327,11 +351,7 @@ export default function ChangePasswordScreen({
                   onChangeText={setNewPassword}
                   editable={!loading}
                   autoCapitalize="none"
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollViewRef.current?.scrollTo({ y: 80, animated: true });
-                    }, 100);
-                  }}
+                  onFocus={() => scrollToInput('newPassword')}
                 />
               </View>
               <TouchableOpacity
@@ -349,6 +369,7 @@ export default function ChangePasswordScreen({
 
             {/* Confirm New Password Field */}
             <View
+              onLayout={(e) => { inputPositions.current.confirmPassword = formCardY.current + e.nativeEvent.layout.y; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
@@ -380,11 +401,7 @@ export default function ChangePasswordScreen({
                   onChangeText={setConfirmPassword}
                   editable={!loading}
                   autoCapitalize="none"
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollViewRef.current?.scrollTo({ y: 140, animated: true });
-                    }, 100);
-                  }}
+                  onFocus={() => scrollToInput('confirmPassword')}
                 />
               </View>
               <TouchableOpacity
@@ -423,6 +440,6 @@ export default function ChangePasswordScreen({
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

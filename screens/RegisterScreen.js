@@ -1,10 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
   ScrollView,
   Platform,
   ActivityIndicator,
@@ -32,6 +31,34 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
+  const inputPositions = useRef({});
+  // Offset from top of ScrollView to start of form card
+  const formCardY = useRef(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e) => setKeyboardPadding(e.endCoordinates.height);
+    const onHide = () => setKeyboardPadding(0);
+
+    const subShow = Keyboard.addListener(showEvent, onShow);
+    const subHide = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, []);
+
+  const scrollToInput = useCallback((fieldName) => {
+    setTimeout(() => {
+      const yPos = inputPositions.current[fieldName];
+      if (yPos != null && scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ y: Math.max(0, yPos - 180), animated: true });
+      }
+    }, 300);
+  }, []);
 
   const handleRegister = async () => {
     setError('');
@@ -100,10 +127,7 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: '#FAF9F6' }}
-    >
+    <View style={{ flex: 1, backgroundColor: '#FAF9F6' }}>
       <StatusBar style="light" />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView
@@ -111,7 +135,7 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
           contentContainerStyle={{
             flexGrow: 1,
             backgroundColor: '#FAF9F6',
-            paddingBottom: 36,
+            paddingBottom: Math.max(36, keyboardPadding + 20),
           }}
           keyboardShouldPersistTaps="handled"
           bounces={false}
@@ -163,6 +187,7 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
 
           {/* Form Card */}
           <View
+            onLayout={(e) => { formCardY.current = e.nativeEvent.layout.y; }}
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: 26,
@@ -224,6 +249,7 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
 
             {/* Room Number Input */}
             <View
+              onLayout={(e) => { inputPositions.current.room = formCardY.current + e.nativeEvent.layout.y; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
@@ -254,15 +280,14 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
                   value={room}
                   onChangeText={setRoom}
                   editable={!loading}
-                  onFocus={() => {
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                  }}
+                  onFocus={() => scrollToInput('room')}
                 />
               </View>
             </View>
 
             {/* Full Name Input */}
             <View
+              onLayout={(e) => { inputPositions.current.fullName = formCardY.current + e.nativeEvent.layout.y; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
@@ -292,15 +317,14 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
                   value={fullName}
                   onChangeText={setFullName}
                   editable={!loading}
-                  onFocus={() => {
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                  }}
+                  onFocus={() => scrollToInput('fullName')}
                 />
               </View>
             </View>
 
             {/* Mobile Number Input */}
             <View
+              onLayout={(e) => { inputPositions.current.mobile = formCardY.current + e.nativeEvent.layout.y; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
@@ -332,15 +356,14 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
                   onChangeText={setMobile}
                   autoCapitalize="none"
                   editable={!loading}
-                  onFocus={() => {
-                    scrollViewRef.current?.scrollTo({ y: 40, animated: true });
-                  }}
+                  onFocus={() => scrollToInput('mobile')}
                 />
               </View>
             </View>
 
             {/* Password Input */}
             <View
+              onLayout={(e) => { inputPositions.current.password = formCardY.current + e.nativeEvent.layout.y; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
@@ -371,11 +394,7 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
                   value={password}
                   onChangeText={setPassword}
                   editable={!loading}
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollViewRef.current?.scrollTo({ y: 120, animated: true });
-                    }, 100);
-                  }}
+                  onFocus={() => scrollToInput('password')}
                 />
               </View>
               <TouchableOpacity
@@ -393,6 +412,7 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
 
             {/* Confirm Password Input */}
             <View
+              onLayout={(e) => { inputPositions.current.confirmPassword = formCardY.current + e.nativeEvent.layout.y; }}
               style={{
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
@@ -423,11 +443,7 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   editable={!loading}
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollViewRef.current?.scrollTo({ y: 180, animated: true });
-                    }, 100);
-                  }}
+                  onFocus={() => scrollToInput('confirmPassword')}
                 />
               </View>
               <TouchableOpacity
@@ -489,6 +505,6 @@ export default function RegisterScreen({ onNavigateLogin, onBack }) {
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
