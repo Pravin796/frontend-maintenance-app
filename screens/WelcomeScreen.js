@@ -1,7 +1,5 @@
-import React from 'react';
 import { Text, View, TouchableOpacity, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import PrimaryButton from '../src/components/PrimaryButton';

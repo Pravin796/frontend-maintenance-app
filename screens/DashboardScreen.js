@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,9 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import { HeroGradientCard, StatusTag } from '../src/components';
 
-export default function DashboardScreen({ user, onLogout, onChangePassword }) {
+export default function DashboardScreen({ user, onLogout, onChangePassword, onNavigateAdmin }) {
   const [activeTab, setActiveTab] = useState('home');
 
   const userName = user?.fullName || 'Pravin Kumar';
@@ -159,108 +158,13 @@ export default function DashboardScreen({ user, onLogout, onChangePassword }) {
               <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
             </TouchableOpacity>
 
-            {/* Outstanding Balance Hero Card */}
-            <View
-              style={{
-                borderRadius: 24,
-                overflow: 'hidden',
-                marginBottom: 16,
-                shadowColor: '#F57C00',
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.28,
-                shadowRadius: 16,
-                elevation: 5,
-              }}
-            >
-              <LinearGradient
-                colors={['#FF6F00', '#FF8500', '#F57C00', '#E65100']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0.95 }}
-                style={{
-                  paddingVertical: 24,
-                  paddingHorizontal: 22,
-                  position: 'relative',
-                  minHeight: 140,
-                  justifyContent: 'center',
-                }}
-              >
-                {/* Subtle Fluid Wave Watermark */}
-                <Svg
-                  width="100%"
-                  height="100%"
-                  viewBox="0 0 340 140"
-                  preserveAspectRatio="none"
-                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                >
-                  <Defs>
-                    <SvgLinearGradient id="heroCardWave" x1="0" y1="0" x2="1" y2="1">
-                      <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.22" />
-                      <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.04" />
-                    </SvgLinearGradient>
-                  </Defs>
-                  <Path
-                    d="M 120,0 C 180,60 250,20 360,90 L 360,140 L 0,140 C 40,80 80,120 120,0 Z"
-                    fill="url(#heroCardWave)"
-                  />
-                  <Path
-                    d="M 200,-20 C 240,40 290,60 360,80"
-                    stroke="rgba(255, 255, 255, 0.2)"
-                    strokeWidth="1.8"
-                    fill="none"
-                  />
-                </Svg>
-
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    zIndex: 2,
-                  }}
-                >
-                  <View>
-                    <Text
-                      style={{
-                        color: 'rgba(255, 255, 255, 0.92)',
-                        fontSize: 14.5,
-                        fontWeight: '500',
-                        marginBottom: 6,
-                        letterSpacing: 0.1,
-                      }}
-                    >
-                      Outstanding Balance
-                    </Text>
-                    <Text
-                      style={{
-                        color: '#FFFFFF',
-                        fontSize: 38,
-                        fontWeight: '800',
-                        letterSpacing: -0.5,
-                      }}
-                    >
-                      ₹1,500
-                    </Text>
-                  </View>
-
-                  {/* Translucent Action Circle Arrow Button */}
-                  <TouchableOpacity
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 21,
-                      backgroundColor: 'rgba(255, 255, 255, 0.26)',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 255, 255, 0.35)',
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-            </View>
+            {/* Outstanding Balance Hero Card - Reusable HeroGradientCard */}
+            <HeroGradientCard
+              variant="balance"
+              title="Outstanding Balance"
+              amount="₹1,500"
+              onActionPress={() => setActiveTab('payments')}
+            />
 
             {/* Monthly Maintenance Card */}
             <TouchableOpacity
@@ -390,25 +294,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword }) {
 
               {/* Paid Badge + Chevron */}
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View
-                  style={{
-                    backgroundColor: '#DCFCE7',
-                    paddingHorizontal: 12,
-                    paddingVertical: 4.5,
-                    borderRadius: 12,
-                    marginRight: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#059669',
-                      fontSize: 12.5,
-                      fontWeight: '700',
-                    }}
-                  >
-                    Paid
-                  </Text>
-                </View>
+                <StatusTag label="Paid" variant="emerald" style={{ marginRight: 8 }} />
                 <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
               </View>
             </TouchableOpacity>
@@ -644,6 +530,28 @@ export default function DashboardScreen({ user, onLogout, onChangePassword }) {
                   Change Password
                 </Text>
                 <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            ) : null}
+
+            {onNavigateAdmin ? (
+              <TouchableOpacity
+                onPress={onNavigateAdmin}
+                style={{
+                  backgroundColor: '#FFF7ED',
+                  borderRadius: 16,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                }}
+              >
+                <Ionicons name="shield-checkmark-outline" size={22} color="#EA580C" style={{ marginRight: 12 }} />
+                <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#EA580C' }}>
+                  Switch to Admin Dashboard
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#EA580C" />
               </TouchableOpacity>
             ) : null}
 

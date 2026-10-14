@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,15 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  ActivityIndicator,
   TouchableWithoutFeedback,
   Keyboard,
   Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import WaveHeader from '../src/components/WaveHeader';
 import PrimaryButton from '../src/components/PrimaryButton';
 import { authService } from '../src/services/authService';

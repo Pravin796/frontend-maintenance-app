@@ -9,6 +9,7 @@ import WelcomeScreen from './screens/WelcomeScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import DashboardScreen from './screens/DashboardScreen';
+import AdminDashboardScreen from './screens/AdminDashboardScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import { Asset } from 'expo-asset';
 import { authService } from './src/services/authService';
@@ -28,6 +29,7 @@ export default function App() {
           Asset.loadAsync([
             require('./assets/icon.png'),
             require('./assets/building.png'),
+            require('./assets/admin-avatar.jpg'),
           ]),
           (async () => {
             const token = await authService.getStoredToken();
@@ -74,7 +76,9 @@ export default function App() {
   const initialRoute = currentUser
     ? currentUser.mustChangePassword
       ? 'ChangePassword'
-      : 'Dashboard'
+      : currentUser.role === 'admin'
+        ? 'AdminDashboard'
+        : 'Dashboard'
     : 'Welcome';
 
   return (
@@ -118,6 +122,11 @@ export default function App() {
                     index: 0,
                     routes: [{ name: 'ChangePassword' }],
                   });
+                } else if (userData.role === 'admin') {
+                  props.navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'AdminDashboard' }],
+                  });
                 } else {
                   props.navigation.reset({
                     index: 0,
@@ -154,7 +163,7 @@ export default function App() {
                 if (nextUser) {
                   props.navigation.reset({
                     index: 0,
-                    routes: [{ name: 'Dashboard' }],
+                    routes: [{ name: nextUser.role === 'admin' ? 'AdminDashboard' : 'Dashboard' }],
                   });
                 } else {
                   props.navigation.reset({
@@ -167,7 +176,7 @@ export default function App() {
                 if (currentUser && !currentUser.mustChangePassword) {
                   props.navigation.reset({
                     index: 0,
-                    routes: [{ name: 'Dashboard' }],
+                    routes: [{ name: currentUser.role === 'admin' ? 'AdminDashboard' : 'Dashboard' }],
                   });
                 } else {
                   props.navigation.reset({
@@ -188,6 +197,19 @@ export default function App() {
               user={currentUser}
               onLogout={handleLogout}
               onChangePassword={() => props.navigation.navigate('ChangePassword')}
+              onNavigateAdmin={() => props.navigation.navigate('AdminDashboard')}
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="AdminDashboard">
+          {(props) => (
+            <AdminDashboardScreen
+              {...props}
+              user={currentUser}
+              onLogout={handleLogout}
+              onChangePassword={() => props.navigation.navigate('ChangePassword')}
+              onNavigateResident={() => props.navigation.navigate('Dashboard')}
             />
           )}
         </Stack.Screen>
