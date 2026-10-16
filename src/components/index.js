@@ -6,3 +6,6 @@ export { default as StatCard } from './StatCard';
 export { default as StatusTag } from './StatusTag';
 export { default as ReviewButton } from './ReviewButton';
 export { default as ActionRowCard } from './ActionRowCard';
+export { default as DualStatCard } from './DualStatCard';
+export { default as QuickActionTile } from './QuickActionTile';
+export { default as NoticeBanner } from './NoticeBanner';

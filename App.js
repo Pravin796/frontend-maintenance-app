@@ -10,6 +10,7 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import AdminDashboardScreen from './screens/AdminDashboardScreen';
+import PaymentScreen from './screens/PaymentScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import { Asset } from 'expo-asset';
 import { authService } from './src/services/authService';
@@ -30,6 +31,7 @@ export default function App() {
             require('./assets/icon.png'),
             require('./assets/building.png'),
             require('./assets/admin-avatar.jpg'),
+            require('./assets/user-avatar.jpg'),
           ]),
           (async () => {
             const token = await authService.getStoredToken();
@@ -229,6 +231,18 @@ export default function App() {
               />
             );
           }}
+        </Stack.Screen>
+        <Stack.Screen name="Payments">
+          {(props) => (
+            <PaymentScreen
+              {...props}
+              user={currentUser}
+              onNavigateHome={() => props.navigation.navigate('Dashboard')}
+              onNavigateHistory={() => props.navigation.navigate('Dashboard')}
+              onNavigateProfile={() => props.navigation.navigate('Dashboard')}
+              onLogout={handleLogout}
+            />
+          )}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>

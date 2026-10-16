@@ -36,16 +36,26 @@ const HeroGradientCard = memo(function HeroGradientCard({
   progress = 45,
   progressLabel,
   onPressChevron,
-  // Balance props
+  // Balance & Due props
   amount = '₹1,500',
+  dueText = 'Due for October 2026',
+  subtitle,
+  buttonText = 'Pay Now',
   onActionPress,
+  onPayPress,
   // General props
   onPress,
   children,
   style,
   colors = ['#FF6F00', '#FF8500', '#F57C00', '#E65100'],
 }) {
-  const displayTitle = title || (variant === 'collection' ? `${month} Collection` : 'Outstanding Balance');
+  const displayTitle = title || (
+    variant === 'collection'
+      ? `${month} Collection`
+      : variant === 'due'
+      ? 'Current Maintenance Due'
+      : 'Outstanding Balance'
+  );
   const displayProgressLabel = progressLabel || `${Math.round(progress)}% collected`;
 
   const CardWrapper = onPress ? TouchableOpacity : View;
@@ -299,6 +309,107 @@ const HeroGradientCard = memo(function HeroGradientCard({
               >
                 <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
               </TouchableOpacity>
+            </View>
+          )}
+
+          {variant === 'due' && (
+            <View>
+              {/* Top row: Credit card icon + Title */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: '#FFFFFF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 10,
+                  }}
+                >
+                  <Ionicons name="card" size={17} color="#F57C00" />
+                </View>
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 15,
+                    fontWeight: '600',
+                    letterSpacing: 0.1,
+                  }}
+                >
+                  {displayTitle}
+                </Text>
+              </View>
+
+              {/* Bottom Row: Amount & Subtitle on left, Pay Now button on right */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-end',
+                }}
+              >
+                <View>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 38,
+                      fontWeight: '800',
+                      letterSpacing: -0.6,
+                      lineHeight: 44,
+                    }}
+                  >
+                    {amount}
+                  </Text>
+                  <Text
+                    style={{
+                      color: 'rgba(255, 255, 255, 0.92)',
+                      fontSize: 13,
+                      fontWeight: '500',
+                      marginTop: 2,
+                    }}
+                  >
+                    {subtitle || dueText}
+                  </Text>
+                </View>
+
+                {/* White Pill Button: Pay Now → */}
+                <TouchableOpacity
+                  onPress={onActionPress || onPayPress || onPress}
+                  activeOpacity={0.88}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    paddingVertical: 10,
+                    paddingHorizontal: 18,
+                    borderRadius: 24,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#EA580C',
+                      fontSize: 14.5,
+                      fontWeight: '700',
+                      marginRight: 6,
+                    }}
+                  >
+                    {buttonText}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={16} color="#EA580C" />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 

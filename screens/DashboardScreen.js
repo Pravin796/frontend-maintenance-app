@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { HeroGradientCard, StatusTag } from '../src/components';
+import { HeroGradientCard, StatusTag, ActionRowCard } from '../src/components';
+import PaymentScreen from './PaymentScreen';
 
 export default function DashboardScreen({ user, onLogout, onChangePassword, onNavigateAdmin }) {
   const [activeTab, setActiveTab] = useState('home');
@@ -574,34 +575,68 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               </Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          /* Placeholder View for Payments / History Tabs */
-          <View style={{ paddingTop: 8, alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+        ) : activeTab === 'payments' ? (
+          <PaymentScreen
+            user={user}
+            isTab={true}
+            onNavigateHome={() => setActiveTab('home')}
+            onNavigateHistory={() => setActiveTab('history')}
+            onNavigateProfile={() => setActiveTab('profile')}
+            onLogout={onLogout}
+          />
+        ) : activeTab === 'history' ? (
+          <View>
+            <View style={{ marginBottom: 18 }}>
+              <Text style={{ fontSize: 14, fontWeight: '500', color: '#64748B', marginBottom: 3 }}>
+                Records
+              </Text>
+              <Text style={{ fontSize: 28, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 }}>
+                Payment History
+              </Text>
+            </View>
+
             <View
               style={{
-                width: 64,
-                height: 64,
-                borderRadius: 32,
-                backgroundColor: '#FFF2E8',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 16,
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20,
+                paddingHorizontal: 16,
+                paddingVertical: 4,
+                borderWidth: 1,
+                borderColor: '#F1F5F9',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.03,
+                shadowRadius: 6,
+                elevation: 1.5,
               }}
             >
-              <Ionicons
-                name={activeTab === 'payments' ? 'card-outline' : 'time-outline'}
-                size={30}
-                color="#F57C00"
-              />
+              {[
+                { month: 'October 2026', amount: '₹500', status: 'pending', date: 'Today, 08:30 AM' },
+                { month: 'September 2026', amount: '₹500', status: 'verified', date: '04 Sep, 2026' },
+                { month: 'August 2026', amount: '₹500', status: 'verified', date: '05 Aug, 2026' },
+                { month: 'July 2026', amount: '₹500', status: 'verified', date: '03 Jul, 2026' },
+                { month: 'June 2026', amount: '₹500', status: 'verified', date: '05 Jun, 2026' },
+              ].map((item, idx) => {
+                const isVerified = item.status === 'verified';
+                return (
+                  <ActionRowCard
+                    key={idx}
+                    iconName={isVerified ? 'checkmark-circle' : 'time'}
+                    iconColor={isVerified ? '#16A34A' : '#D97706'}
+                    iconBgColor={isVerified ? '#DCFCE7' : '#FEF3C7'}
+                    title={`Room ${roomNumber} • ${item.month}`}
+                    subtitle={`${item.amount} • ${item.date}`}
+                    tagLabel={isVerified ? 'Verified' : 'Pending'}
+                    tagVariant={isVerified ? 'green' : 'amber'}
+                    showChevron={true}
+                    chevronColor="#94A3B8"
+                    showDivider={idx < 4}
+                  />
+                );
+              })}
             </View>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#1E293B', marginBottom: 6 }}>
-              {activeTab === 'payments' ? 'Payments Section' : 'Payment History'}
-            </Text>
-            <Text style={{ fontSize: 13.5, color: '#64748B', textAlign: 'center', paddingHorizontal: 32 }}>
-              Detailed records and payment flows will be connected with backend APIs soon.
-            </Text>
           </View>
-        )}
+        ) : null}
       </ScrollView>
 
       {/* Bottom Navigation Bar */}
