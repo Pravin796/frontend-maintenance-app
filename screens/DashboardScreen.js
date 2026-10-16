@@ -533,7 +533,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               </TouchableOpacity>
             ) : null}
 
-            {onNavigateAdmin ? (
+            {user?.role === 'ADMIN' && onNavigateAdmin ? (
               <TouchableOpacity
                 onPress={onNavigateAdmin}
                 style={{

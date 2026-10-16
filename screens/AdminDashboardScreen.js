@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,12 +20,31 @@ import {
   StatusTag,
 } from '../src/components';
 
-export default function AdminDashboardScreen({ user, onLogout, onChangePassword, onNavigateResident }) {
+export default function AdminDashboardScreen({
+  navigation,
+  user,
+  onLogout,
+  onChangePassword,
+  onNavigateResident,
+}) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
+
+  useEffect(() => {
+    if (user?.role !== 'ADMIN') {
+      navigation?.reset?.({
+        index: 0,
+        routes: [{ name: user ? 'Dashboard' : 'Welcome' }],
+      });
+    }
+  }, [user, navigation]);
+
+  if (user?.role !== 'ADMIN') {
+    return null;
+  }
 
   // Initial mock state for pending payments
   const [payments, setPayments] = useState([

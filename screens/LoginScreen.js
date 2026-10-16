@@ -525,38 +525,6 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
                 </Text>
               </TouchableOpacity>
             </View>
-
-            {/* Quick Admin Access Button */}
-            <TouchableOpacity
-              onPress={() => {
-                onLogin({
-                  userId: 'admin-001',
-                  roomNumber: 'Admin',
-                  mobileNumber: '9999999999',
-                  role: 'admin',
-                  token: 'demo-admin-token',
-                  mustChangePassword: false,
-                });
-              }}
-              activeOpacity={0.8}
-              style={{
-                marginTop: 20,
-                alignSelf: 'center',
-                paddingVertical: 9,
-                paddingHorizontal: 16,
-                borderRadius: 20,
-                backgroundColor: '#FFF7ED',
-                borderWidth: 1,
-                borderColor: '#FED7AA',
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
-            >
-              <Ionicons name="shield-checkmark" size={16} color="#EA580C" style={{ marginRight: 6 }} />
-              <Text style={{ color: '#EA580C', fontWeight: '700', fontSize: 12.5 }}>
-                Demo: Enter as Admin
-              </Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>

@@ -76,7 +76,7 @@ export default function App() {
   const initialRoute = currentUser
     ? currentUser.mustChangePassword
       ? 'ChangePassword'
-      : currentUser.role === 'admin'
+      : currentUser.role === 'ADMIN'
         ? 'AdminDashboard'
         : 'Dashboard'
     : 'Welcome';
@@ -122,7 +122,7 @@ export default function App() {
                     index: 0,
                     routes: [{ name: 'ChangePassword' }],
                   });
-                } else if (userData.role === 'admin') {
+                } else if (userData.role === 'ADMIN') {
                   props.navigation.reset({
                     index: 0,
                     routes: [{ name: 'AdminDashboard' }],
@@ -163,7 +163,7 @@ export default function App() {
                 if (nextUser) {
                   props.navigation.reset({
                     index: 0,
-                    routes: [{ name: nextUser.role === 'admin' ? 'AdminDashboard' : 'Dashboard' }],
+                    routes: [{ name: nextUser.role === 'ADMIN' ? 'AdminDashboard' : 'Dashboard' }],
                   });
                 } else {
                   props.navigation.reset({
@@ -176,7 +176,7 @@ export default function App() {
                 if (currentUser && !currentUser.mustChangePassword) {
                   props.navigation.reset({
                     index: 0,
-                    routes: [{ name: currentUser.role === 'admin' ? 'AdminDashboard' : 'Dashboard' }],
+                    routes: [{ name: currentUser.role === 'ADMIN' ? 'AdminDashboard' : 'Dashboard' }],
                   });
                 } else {
                   props.navigation.reset({
@@ -197,21 +197,38 @@ export default function App() {
               user={currentUser}
               onLogout={handleLogout}
               onChangePassword={() => props.navigation.navigate('ChangePassword')}
-              onNavigateAdmin={() => props.navigation.navigate('AdminDashboard')}
+              onNavigateAdmin={
+                currentUser?.role === 'ADMIN'
+                  ? () => {
+                      if (currentUser?.role === 'ADMIN') {
+                        props.navigation.navigate('AdminDashboard');
+                      }
+                    }
+                  : undefined
+              }
             />
           )}
         </Stack.Screen>
 
         <Stack.Screen name="AdminDashboard">
-          {(props) => (
-            <AdminDashboardScreen
-              {...props}
-              user={currentUser}
-              onLogout={handleLogout}
-              onChangePassword={() => props.navigation.navigate('ChangePassword')}
-              onNavigateResident={() => props.navigation.navigate('Dashboard')}
-            />
-          )}
+          {(props) => {
+            if (currentUser?.role !== 'ADMIN') {
+              props.navigation.reset({
+                index: 0,
+                routes: [{ name: currentUser ? 'Dashboard' : 'Welcome' }],
+              });
+              return null;
+            }
+            return (
+              <AdminDashboardScreen
+                {...props}
+                user={currentUser}
+                onLogout={handleLogout}
+                onChangePassword={() => props.navigation.navigate('ChangePassword')}
+                onNavigateResident={() => props.navigation.navigate('Dashboard')}
+              />
+            );
+          }}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
