@@ -1,14 +1,14 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Platform,
   Alert,
   Animated,
   Easing,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -26,14 +26,19 @@ const TAB_ORDER = ['home', 'payments', 'history', 'profile'];
 
 export default function DashboardScreen({ user, onLogout, onChangePassword, onNavigateAdmin }) {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+
   const [activeTab, setActiveTab] = useState('home');
   const [notificationsVisible, setNotificationsVisible] = useState(false);
 
-  const scrollViewRef = useRef(null);
+  // Horizontal pager animation for smooth, 100% flicker-free sliding
+  const pagerAnim = useRef(new Animated.Value(0)).current;
 
-  // Transition animations for page content switching
-  const contentFadeAnim = useRef(new Animated.Value(1)).current;
-  const contentSlideAnim = useRef(new Animated.Value(0)).current;
+  // Separate scroll view refs for each tab
+  const homeScrollRef = useRef(null);
+  const paymentsScrollRef = useRef(null);
+  const historyScrollRef = useRef(null);
+  const profileScrollRef = useRef(null);
 
   // Scale animations for individual bottom tab buttons
   const tabScaleAnims = useRef({
@@ -46,6 +51,12 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   const userName = user?.fullName || 'Pravin Kumar';
   const roomNumber = user?.roomNumber || '104';
 
+  // Keep pager aligned if screen orientation or dimensions change
+  useEffect(() => {
+    const idx = TAB_ORDER.indexOf(activeTab);
+    pagerAnim.setValue(-idx * screenWidth);
+  }, [screenWidth, activeTab, pagerAnim]);
+
   const handleLogoutConfirm = () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -54,54 +65,43 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   };
 
   /**
-   * Smooth animated transition between tabs
+   * Continuous, hardware-accelerated slide between tabs with zero flicker
    */
   const handleTabPress = useCallback(
     (nextTab) => {
       if (nextTab === activeTab) {
-        // Scroll to top if tapping active tab
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        // Scroll active tab to top
+        if (nextTab === 'home') homeScrollRef.current?.scrollTo({ y: 0, animated: true });
+        else if (nextTab === 'payments') paymentsScrollRef.current?.scrollTo({ y: 0, animated: true });
+        else if (nextTab === 'history') historyScrollRef.current?.scrollTo({ y: 0, animated: true });
+        else if (nextTab === 'profile') profileScrollRef.current?.scrollTo({ y: 0, animated: true });
         return;
       }
 
-      const currentIndex = TAB_ORDER.indexOf(activeTab);
       const nextIndex = TAB_ORDER.indexOf(nextTab);
-      const direction = nextIndex > currentIndex ? 1 : -1;
 
       // Subtle spring bounce on pressed tab icon
       if (tabScaleAnims[nextTab]) {
-        tabScaleAnims[nextTab].setValue(0.82);
+        tabScaleAnims[nextTab].setValue(0.85);
         Animated.spring(tabScaleAnims[nextTab], {
           toValue: 1,
-          friction: 5,
-          tension: 180,
+          friction: 6,
+          tension: 200,
           useNativeDriver: true,
         }).start();
       }
 
-      // Initial state for incoming page: directional slide + soft fade
-      contentSlideAnim.setValue(direction * 26);
-      contentFadeAnim.setValue(0.2);
-
       setActiveTab(nextTab);
 
-      // Smooth parallel transition
-      Animated.parallel([
-        Animated.timing(contentFadeAnim, {
-          toValue: 1,
-          duration: 220,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(contentSlideAnim, {
-          toValue: 0,
-          duration: 220,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Smooth continuous glide to the selected tab with zero unmount/remount
+      Animated.timing(pagerAnim, {
+        toValue: -nextIndex * screenWidth,
+        duration: 250,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        useNativeDriver: true,
+      }).start();
     },
-    [activeTab, contentFadeAnim, contentSlideAnim, tabScaleAnims]
+    [activeTab, screenWidth, pagerAnim, tabScaleAnims]
   );
 
   return (
@@ -118,26 +118,27 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
         onPressLogo={() => handleTabPress('home')}
       />
 
-      {/* Main Content Area */}
-      <ScrollView
-        ref={scrollViewRef}
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 28,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Animated Page Transition Container */}
+      {/* Horizontal Sliding Pager Container (zero-flicker native translation) */}
+      <View style={{ flex: 1, overflow: 'hidden' }}>
         <Animated.View
           style={{
             flex: 1,
-            opacity: contentFadeAnim,
-            transform: [{ translateX: contentSlideAnim }],
+            flexDirection: 'row',
+            width: screenWidth * 4,
+            transform: [{ translateX: pagerAnim }],
           }}
         >
-          {activeTab === 'home' ? (
-            <>
+          {/* TAB 0: HOME */}
+          <View style={{ width: screenWidth, flex: 1 }}>
+            <ScrollView
+              ref={homeScrollRef}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingTop: 8,
+                paddingBottom: 28,
+              }}
+              showsVerticalScrollIndicator={false}
+            >
               {/* Room Card */}
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -498,10 +499,98 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   </Text>
                 </TouchableOpacity>
               </View>
-            </>
-          ) : activeTab === 'profile' ? (
-            /* Profile Tab View */
-            <View style={{ paddingTop: 4 }}>
+            </ScrollView>
+          </View>
+
+          {/* TAB 1: PAYMENTS */}
+          <View style={{ width: screenWidth, flex: 1 }}>
+            <ScrollView
+              ref={paymentsScrollRef}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingTop: 8,
+                paddingBottom: 28,
+              }}
+              showsVerticalScrollIndicator={false}
+            >
+              <PaymentScreen
+                user={user}
+                isTab={true}
+                showHeader={false}
+                onNavigateHome={() => handleTabPress('home')}
+                onNavigateHistory={() => handleTabPress('history')}
+                onNavigateProfile={() => handleTabPress('profile')}
+                onOpenNotifications={() => setNotificationsVisible(true)}
+                onLogout={onLogout}
+              />
+            </ScrollView>
+          </View>
+
+          {/* TAB 2: HISTORY */}
+          <View style={{ width: screenWidth, flex: 1 }}>
+            <ScrollView
+              ref={historyScrollRef}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingTop: 8,
+                paddingBottom: 28,
+              }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 20,
+                  paddingHorizontal: 16,
+                  paddingVertical: 4,
+                  borderWidth: 1,
+                  borderColor: '#F1F5F9',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.03,
+                  shadowRadius: 6,
+                  elevation: 1.5,
+                }}
+              >
+                {[
+                  { month: 'October 2026', amount: '₹500', status: 'pending', date: 'Today, 08:30 AM' },
+                  { month: 'September 2026', amount: '₹500', status: 'verified', date: '04 Sep, 2026' },
+                  { month: 'August 2026', amount: '₹500', status: 'verified', date: '05 Aug, 2026' },
+                  { month: 'July 2026', amount: '₹500', status: 'verified', date: '03 Jul, 2026' },
+                  { month: 'June 2026', amount: '₹500', status: 'verified', date: '05 Jun, 2026' },
+                ].map((item, idx) => {
+                  const isVerified = item.status === 'verified';
+                  return (
+                    <ActionRowCard
+                      key={idx}
+                      iconName={isVerified ? 'checkmark-circle' : 'time'}
+                      iconColor={isVerified ? '#16A34A' : '#D97706'}
+                      iconBgColor={isVerified ? '#DCFCE7' : '#FEF3C7'}
+                      title={`Room ${roomNumber} • ${item.month}`}
+                      subtitle={`${item.amount} • ${item.date}`}
+                      tagLabel={isVerified ? 'Verified' : 'Pending'}
+                      tagVariant={isVerified ? 'green' : 'amber'}
+                      showChevron={true}
+                      chevronColor="#94A3B8"
+                      showDivider={idx < 4}
+                    />
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* TAB 3: PROFILE */}
+          <View style={{ width: screenWidth, flex: 1 }}>
+            <ScrollView
+              ref={profileScrollRef}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingTop: 8,
+                paddingBottom: 28,
+              }}
+              showsVerticalScrollIndicator={false}
+            >
               <View
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -605,66 +694,10 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   Logout
                 </Text>
               </TouchableOpacity>
-            </View>
-          ) : activeTab === 'payments' ? (
-            /* Payments Tab View: Reuses ScreenHeader and HeroGradientCard without reloading header */
-            <PaymentScreen
-              user={user}
-              isTab={true}
-              showHeader={false}
-              onNavigateHome={() => handleTabPress('home')}
-              onNavigateHistory={() => handleTabPress('history')}
-              onNavigateProfile={() => handleTabPress('profile')}
-              onOpenNotifications={() => setNotificationsVisible(true)}
-              onLogout={onLogout}
-            />
-          ) : activeTab === 'history' ? (
-            /* History Tab View */
-            <View style={{ paddingTop: 4 }}>
-              <View
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 20,
-                  paddingHorizontal: 16,
-                  paddingVertical: 4,
-                  borderWidth: 1,
-                  borderColor: '#F1F5F9',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.03,
-                  shadowRadius: 6,
-                  elevation: 1.5,
-                }}
-              >
-                {[
-                  { month: 'October 2026', amount: '₹500', status: 'pending', date: 'Today, 08:30 AM' },
-                  { month: 'September 2026', amount: '₹500', status: 'verified', date: '04 Sep, 2026' },
-                  { month: 'August 2026', amount: '₹500', status: 'verified', date: '05 Aug, 2026' },
-                  { month: 'July 2026', amount: '₹500', status: 'verified', date: '03 Jul, 2026' },
-                  { month: 'June 2026', amount: '₹500', status: 'verified', date: '05 Jun, 2026' },
-                ].map((item, idx) => {
-                  const isVerified = item.status === 'verified';
-                  return (
-                    <ActionRowCard
-                      key={idx}
-                      iconName={isVerified ? 'checkmark-circle' : 'time'}
-                      iconColor={isVerified ? '#16A34A' : '#D97706'}
-                      iconBgColor={isVerified ? '#DCFCE7' : '#FEF3C7'}
-                      title={`Room ${roomNumber} • ${item.month}`}
-                      subtitle={`${item.amount} • ${item.date}`}
-                      tagLabel={isVerified ? 'Verified' : 'Pending'}
-                      tagVariant={isVerified ? 'green' : 'amber'}
-                      showChevron={true}
-                      chevronColor="#94A3B8"
-                      showDivider={idx < 4}
-                    />
-                  );
-                })}
-              </View>
-            </View>
-          ) : null}
+            </ScrollView>
+          </View>
         </Animated.View>
-      </ScrollView>
+      </View>
 
       {/* Notifications Modal */}
       <NotificationsModal

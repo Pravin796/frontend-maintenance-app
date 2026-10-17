@@ -185,31 +185,21 @@ export default function PaymentScreen({
         Quick Actions
       </Text>
 
-      {/* 4 Action Tiles in a Row */}
+      {/* 3 Quick Action Tiles in a Row */}
       <View
         style={{
           flexDirection: 'row',
           justifyContent: 'space-between',
-          gap: 9,
+          gap: 12,
           marginBottom: 24,
         }}
       >
-        <QuickActionTile
-          title={'Pay\nMaintenance'}
-          iconName="card"
-          iconColor="#EA580C"
-          iconBgColor="#FFF3E8"
-          onPress={() => {
-            setPayTab('online');
-            setPayModalVisible(true);
-          }}
-        />
-
         <QuickActionTile
           title={'Online\nPayment'}
           iconName="qr-code-outline"
           iconColor="#D97706"
           iconBgColor="#FEF3C7"
+          arrowColor="#D97706"
           onPress={() => {
             setPayTab('online');
             setPayModalVisible(true);
@@ -221,6 +211,7 @@ export default function PaymentScreen({
           iconName="cash-outline"
           iconColor="#EA580C"
           iconBgColor="#FFF3E8"
+          arrowColor="#EA580C"
           onPress={() => {
             setPayTab('cash');
             setPayModalVisible(true);
@@ -232,6 +223,7 @@ export default function PaymentScreen({
           iconName="time-outline"
           iconColor="#0284C7"
           iconBgColor="#E0F2FE"
+          arrowColor="#0284C7"
           onPress={() => {
             if (onNavigateHistory) {
               onNavigateHistory();

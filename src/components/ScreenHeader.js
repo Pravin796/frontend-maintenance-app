@@ -94,12 +94,18 @@ const ScreenHeader = memo(function ScreenHeader({
 
   // Animate text smoothly when dynamicTitle or dynamicSubtitle changes
   useEffect(() => {
-    textAnim.setValue(0.7);
-    Animated.timing(textAnim, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
+    Animated.sequence([
+      Animated.timing(textAnim, {
+        toValue: 0.35,
+        duration: 70,
+        useNativeDriver: true,
+      }),
+      Animated.timing(textAnim, {
+        toValue: 1,
+        duration: 160,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, [dynamicTitle, dynamicSubtitle, textAnim]);
 
   return (
