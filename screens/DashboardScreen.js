@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,41 @@ import {
   ScrollView,
   Platform,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { HeroGradientCard, StatusTag, ActionRowCard } from '../src/components';
+import {
+  HeroGradientCard,
+  StatusTag,
+  ActionRowCard,
+  ScreenHeader,
+  NotificationsModal,
+} from '../src/components';
 import PaymentScreen from './PaymentScreen';
 
+const TAB_ORDER = ['home', 'payments', 'history', 'profile'];
+
 export default function DashboardScreen({ user, onLogout, onChangePassword, onNavigateAdmin }) {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('home');
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+
+  const scrollViewRef = useRef(null);
+
+  // Transition animations for page content switching
+  const contentFadeAnim = useRef(new Animated.Value(1)).current;
+  const contentSlideAnim = useRef(new Animated.Value(0)).current;
+
+  // Scale animations for individual bottom tab buttons
+  const tabScaleAnims = useRef({
+    home: new Animated.Value(1),
+    payments: new Animated.Value(1),
+    history: new Animated.Value(1),
+    profile: new Animated.Value(1),
+  }).current;
 
   const userName = user?.fullName || 'Pravin Kumar';
   const roomNumber = user?.roomNumber || '104';
@@ -26,310 +53,103 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
     ]);
   };
 
+  /**
+   * Smooth animated transition between tabs
+   */
+  const handleTabPress = useCallback(
+    (nextTab) => {
+      if (nextTab === activeTab) {
+        // Scroll to top if tapping active tab
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        return;
+      }
+
+      const currentIndex = TAB_ORDER.indexOf(activeTab);
+      const nextIndex = TAB_ORDER.indexOf(nextTab);
+      const direction = nextIndex > currentIndex ? 1 : -1;
+
+      // Subtle spring bounce on pressed tab icon
+      if (tabScaleAnims[nextTab]) {
+        tabScaleAnims[nextTab].setValue(0.82);
+        Animated.spring(tabScaleAnims[nextTab], {
+          toValue: 1,
+          friction: 5,
+          tension: 180,
+          useNativeDriver: true,
+        }).start();
+      }
+
+      // Initial state for incoming page: directional slide + soft fade
+      contentSlideAnim.setValue(direction * 26);
+      contentFadeAnim.setValue(0.2);
+
+      setActiveTab(nextTab);
+
+      // Smooth parallel transition
+      Animated.parallel([
+        Animated.timing(contentFadeAnim, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentSlideAnim, {
+          toValue: 0,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    },
+    [activeTab, contentFadeAnim, contentSlideAnim, tabScaleAnims]
+  );
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAF9F6' }}>
+    <View style={{ flex: 1, backgroundColor: '#FAF9F6' }}>
       <StatusBar style="dark" />
+
+      {/* Persistent Reusable Screen Header: stays mounted, smoothly updates text/data */}
+      <ScreenHeader
+        user={user}
+        activeTab={activeTab}
+        unreadCount={2}
+        onPressNotifications={() => setNotificationsVisible(true)}
+        onPressAvatar={() => handleTabPress('profile')}
+        onPressLogo={() => handleTabPress('home')}
+      />
 
       {/* Main Content Area */}
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={{
           paddingHorizontal: 20,
-          paddingTop: Platform.OS === 'android' ? 36 : 14,
+          paddingTop: 8,
           paddingBottom: 28,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {activeTab === 'home' ? (
-          <>
-            {/* Header: Greeting + Name & Notification Bell */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 18,
-              }}
-            >
-              <View>
-                <Text
-                  style={{
-                    fontSize: 14.5,
-                    fontWeight: '500',
-                    color: '#64748B',
-                    marginBottom: 3,
-                  }}
-                >
-                  Good morning,
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 23,
-                    fontWeight: '800',
-                    color: '#111827',
-                    letterSpacing: -0.3,
-                  }}
-                >
-                  {userName} 👋
-                </Text>
-              </View>
-
-              {/* Notification Bell with Red Badge */}
+        {/* Animated Page Transition Container */}
+        <Animated.View
+          style={{
+            flex: 1,
+            opacity: contentFadeAnim,
+            transform: [{ translateX: contentSlideAnim }],
+          }}
+        >
+          {activeTab === 'home' ? (
+            <>
+              {/* Room Card */}
               <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => handleTabPress('profile')}
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: '#FFFFFF',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.04,
-                  shadowRadius: 6,
-                  elevation: 1,
-                  borderWidth: 1,
-                  borderColor: '#F1F5F9',
-                  position: 'relative',
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="notifications-outline" size={24} color="#334155" />
-                {/* Red dot badge */}
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 10,
-                    right: 11,
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: '#EF4444',
-                    borderWidth: 1.5,
-                    borderColor: '#FFFFFF',
-                  }}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Room Card */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 20,
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 16,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.03,
-                shadowRadius: 6,
-                elevation: 1.5,
-                borderWidth: 1,
-                borderColor: '#F1F5F9',
-              }}
-            >
-              <View
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  backgroundColor: '#F57C00',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 14,
-                }}
-              >
-                <Ionicons name="home" size={20} color="#FFFFFF" />
-              </View>
-
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: '700',
-                  color: '#1E293B',
-                  flex: 1,
-                }}
-              >
-                Room {roomNumber}
-              </Text>
-
-              <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
-            </TouchableOpacity>
-
-            {/* Outstanding Balance Hero Card - Reusable HeroGradientCard */}
-            <HeroGradientCard
-              variant="balance"
-              title="Outstanding Balance"
-              amount="₹1,500"
-              onActionPress={() => setActiveTab('payments')}
-            />
-
-            {/* Monthly Maintenance Card */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 20,
-                padding: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 14,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.03,
-                shadowRadius: 6,
-                elevation: 1.5,
-                borderWidth: 1,
-                borderColor: '#F1F5F9',
-              }}
-            >
-              {/* Soft Peach Circle Icon */}
-              <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 16,
-                  backgroundColor: '#FFF3E8',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 14,
-                }}
-              >
-                <Ionicons name="calendar-outline" size={23} color="#F57C00" />
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: '600',
-                    color: '#334155',
-                    marginBottom: 2,
-                  }}
-                >
-                  Monthly Maintenance
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 21,
-                    fontWeight: '800',
-                    color: '#0F172A',
-                    letterSpacing: -0.3,
-                    marginBottom: 2,
-                  }}
-                >
-                  ₹500
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: '400',
-                    color: '#64748B',
-                  }}
-                >
-                  Due on 5th of every month
-                </Text>
-              </View>
-
-              <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
-            </TouchableOpacity>
-
-            {/* Recent Payment Card */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 20,
-                padding: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 24,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.03,
-                shadowRadius: 6,
-                elevation: 1.5,
-                borderWidth: 1,
-                borderColor: '#F1F5F9',
-              }}
-            >
-              {/* Soft Mint Circle Icon */}
-              <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 16,
-                  backgroundColor: '#ECFDF5',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 14,
-                }}
-              >
-                <Ionicons name="checkmark-circle" size={24} color="#059669" />
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: '600',
-                    color: '#334155',
-                    marginBottom: 4,
-                  }}
-                >
-                  Recent Payment
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 13.5,
-                    fontWeight: '500',
-                    color: '#334155',
-                  }}
-                >
-                  September 2026 • ₹500
-                </Text>
-              </View>
-
-              {/* Paid Badge + Chevron */}
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <StatusTag label="Paid" variant="emerald" style={{ marginRight: 8 }} />
-                <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
-              </View>
-            </TouchableOpacity>
-
-            {/* Quick Actions Header */}
-            <Text
-              style={{
-                fontSize: 16.5,
-                fontWeight: '700',
-                color: '#1E293B',
-                marginBottom: 14,
-              }}
-            >
-              Quick Actions
-            </Text>
-
-            {/* Quick Actions 3-Column Grid */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}
-            >
-              {/* Tile 1: Make Payment */}
-              <TouchableOpacity
-                activeOpacity={0.82}
-                style={{
-                  flex: 1,
                   backgroundColor: '#FFFFFF',
                   borderRadius: 20,
-                  paddingVertical: 18,
-                  paddingHorizontal: 8,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  flexDirection: 'row',
                   alignItems: 'center',
+                  marginBottom: 16,
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.03,
@@ -341,312 +161,525 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               >
                 <View
                   style={{
-                    width: 46,
-                    height: 46,
-                    borderRadius: 14,
+                    width: 42,
+                    height: 42,
+                    borderRadius: 21,
+                    backgroundColor: '#F57C00',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 14,
+                  }}
+                >
+                  <Ionicons name="home" size={20} color="#FFFFFF" />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '700',
+                      color: '#1E293B',
+                    }}
+                  >
+                    Room {roomNumber}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                    Primary Residence • Block A
+                  </Text>
+                </View>
+
+                <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
+              </TouchableOpacity>
+
+              {/* Outstanding Balance Hero Card - Reusable HeroGradientCard */}
+              <HeroGradientCard
+                variant="balance"
+                title="Outstanding Balance"
+                amount="₹1,500"
+                onActionPress={() => handleTabPress('payments')}
+              />
+
+              {/* Monthly Maintenance Card */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => handleTabPress('payments')}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 20,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 14,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.03,
+                  shadowRadius: 6,
+                  elevation: 1.5,
+                  borderWidth: 1,
+                  borderColor: '#F1F5F9',
+                }}
+              >
+                {/* Soft Peach Circle Icon */}
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 16,
+                    backgroundColor: '#FFF3E8',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 14,
+                  }}
+                >
+                  <Ionicons name="calendar-outline" size={23} color="#F57C00" />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '600',
+                      color: '#334155',
+                      marginBottom: 2,
+                    }}
+                  >
+                    Monthly Maintenance
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 21,
+                      fontWeight: '800',
+                      color: '#0F172A',
+                      letterSpacing: -0.3,
+                      marginBottom: 2,
+                    }}
+                  >
+                    ₹500
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: '400',
+                      color: '#64748B',
+                    }}
+                  >
+                    Due on 5th of every month
+                  </Text>
+                </View>
+
+                <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
+              </TouchableOpacity>
+
+              {/* Recent Payment Card */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => handleTabPress('history')}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 20,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 24,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.03,
+                  shadowRadius: 6,
+                  elevation: 1.5,
+                  borderWidth: 1,
+                  borderColor: '#F1F5F9',
+                }}
+              >
+                {/* Soft Mint Circle Icon */}
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 16,
+                    backgroundColor: '#ECFDF5',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 14,
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={24} color="#059669" />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '600',
+                      color: '#334155',
+                      marginBottom: 4,
+                    }}
+                  >
+                    Recent Payment
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: '500',
+                      color: '#334155',
+                    }}
+                  >
+                    September 2026 • ₹500
+                  </Text>
+                </View>
+
+                {/* Paid Badge + Chevron */}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <StatusTag label="Paid" variant="emerald" style={{ marginRight: 8 }} />
+                  <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
+                </View>
+              </TouchableOpacity>
+
+              {/* Quick Actions Header */}
+              <Text
+                style={{
+                  fontSize: 16.5,
+                  fontWeight: '700',
+                  color: '#1E293B',
+                  marginBottom: 14,
+                }}
+              >
+                Quick Actions
+              </Text>
+
+              {/* Quick Actions 3-Column Grid */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
+                {/* Tile 1: Make Payment */}
+                <TouchableOpacity
+                  activeOpacity={0.82}
+                  onPress={() => handleTabPress('payments')}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 20,
+                    paddingVertical: 18,
+                    paddingHorizontal: 8,
+                    alignItems: 'center',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.03,
+                    shadowRadius: 6,
+                    elevation: 1.5,
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: 14,
+                      backgroundColor: '#FFF2E8',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Ionicons name="card" size={22} color="#F57C00" />
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: '600',
+                      color: '#1E293B',
+                      textAlign: 'center',
+                      lineHeight: 16,
+                    }}
+                  >
+                    {'Make\nPayment'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Tile 2: View History */}
+                <TouchableOpacity
+                  activeOpacity={0.82}
+                  onPress={() => handleTabPress('history')}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 20,
+                    paddingVertical: 18,
+                    paddingHorizontal: 8,
+                    alignItems: 'center',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.03,
+                    shadowRadius: 6,
+                    elevation: 1.5,
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: 14,
+                      backgroundColor: '#FEF3C7',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Ionicons name="time" size={22} color="#D97706" />
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: '600',
+                      color: '#1E293B',
+                      textAlign: 'center',
+                      lineHeight: 16,
+                    }}
+                  >
+                    {'View\nHistory'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Tile 3: Raise Complaint */}
+                <TouchableOpacity
+                  activeOpacity={0.82}
+                  onPress={() => {
+                    Alert.alert(
+                      'Raise Complaint',
+                      'Please contact the facility manager at +91 98765 43210 or leave a message with society reception.',
+                      [{ text: 'OK' }]
+                    );
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 20,
+                    paddingVertical: 18,
+                    paddingHorizontal: 8,
+                    alignItems: 'center',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.03,
+                    shadowRadius: 6,
+                    elevation: 1.5,
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: 14,
+                      backgroundColor: '#DBEAFE',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Ionicons name="chatbox-ellipses" size={22} color="#2563EB" />
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: '600',
+                      color: '#1E293B',
+                      textAlign: 'center',
+                      lineHeight: 16,
+                    }}
+                  >
+                    {'Raise\nComplaint'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : activeTab === 'profile' ? (
+            /* Profile Tab View */
+            <View style={{ paddingTop: 4 }}>
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 20,
+                  padding: 20,
+                  alignItems: 'center',
+                  marginBottom: 20,
+                  borderWidth: 1,
+                  borderColor: '#F1F5F9',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.03,
+                  shadowRadius: 6,
+                  elevation: 1.5,
+                }}
+              >
+                <View
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
                     backgroundColor: '#FFF2E8',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: 10,
+                    marginBottom: 12,
                   }}
                 >
-                  <Ionicons name="card" size={22} color="#F57C00" />
+                  <Ionicons name="person" size={36} color="#F57C00" />
                 </View>
-                <Text
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#1E293B' }}>{userName}</Text>
+                <Text style={{ fontSize: 14, color: '#64748B', marginTop: 2 }}>
+                  Room {roomNumber} • {user?.role || 'Resident'}
+                </Text>
+                {user?.mobileNumber ? (
+                  <Text style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>
+                    +91 {user.mobileNumber}
+                  </Text>
+                ) : null}
+              </View>
+
+              {/* Profile Action Options */}
+              {onChangePassword ? (
+                <TouchableOpacity
+                  onPress={onChangePassword}
                   style={{
-                    fontSize: 12.5,
-                    fontWeight: '600',
-                    color: '#1E293B',
-                    textAlign: 'center',
-                    lineHeight: 16,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 16,
+                    padding: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 12,
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
                   }}
                 >
-                  {'Make\nPayment'}
-                </Text>
-              </TouchableOpacity>
+                  <Ionicons name="key-outline" size={22} color="#F57C00" style={{ marginRight: 12 }} />
+                  <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1E293B' }}>
+                    Change Password
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              ) : null}
 
-              {/* Tile 2: View History */}
+              {user?.role === 'ADMIN' && onNavigateAdmin ? (
+                <TouchableOpacity
+                  onPress={onNavigateAdmin}
+                  style={{
+                    backgroundColor: '#FFF7ED',
+                    borderRadius: 16,
+                    padding: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 12,
+                    borderWidth: 1,
+                    borderColor: '#FED7AA',
+                  }}
+                >
+                  <Ionicons name="shield-checkmark-outline" size={22} color="#EA580C" style={{ marginRight: 12 }} />
+                  <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#EA580C' }}>
+                    Switch to Admin Dashboard
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color="#EA580C" />
+                </TouchableOpacity>
+              ) : null}
+
               <TouchableOpacity
-                activeOpacity={0.82}
-                onPress={() => setActiveTab('history')}
+                onPress={handleLogoutConfirm}
                 style={{
-                  flex: 1,
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 20,
-                  paddingVertical: 18,
-                  paddingHorizontal: 8,
+                  backgroundColor: '#FEF2F2',
+                  borderRadius: 16,
+                  padding: 16,
+                  flexDirection: 'row',
                   alignItems: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.03,
-                  shadowRadius: 6,
-                  elevation: 1.5,
                   borderWidth: 1,
-                  borderColor: '#F1F5F9',
+                  borderColor: '#FEE2E2',
+                  marginTop: 8,
                 }}
               >
-                <View
-                  style={{
-                    width: 46,
-                    height: 46,
-                    borderRadius: 14,
-                    backgroundColor: '#FEF3C7',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 10,
-                  }}
-                >
-                  <Ionicons name="time" size={22} color="#D97706" />
-                </View>
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: '600',
-                    color: '#1E293B',
-                    textAlign: 'center',
-                    lineHeight: 16,
-                  }}
-                >
-                  {'View\nHistory'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Tile 3: Raise Complaint */}
-              <TouchableOpacity
-                activeOpacity={0.82}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 20,
-                  paddingVertical: 18,
-                  paddingHorizontal: 8,
-                  alignItems: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.03,
-                  shadowRadius: 6,
-                  elevation: 1.5,
-                  borderWidth: 1,
-                  borderColor: '#F1F5F9',
-                }}
-              >
-                <View
-                  style={{
-                    width: 46,
-                    height: 46,
-                    borderRadius: 14,
-                    backgroundColor: '#DBEAFE',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 10,
-                  }}
-                >
-                  <Ionicons name="chatbox-ellipses" size={22} color="#2563EB" />
-                </View>
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: '600',
-                    color: '#1E293B',
-                    textAlign: 'center',
-                    lineHeight: 16,
-                  }}
-                >
-                  {'Raise\nComplaint'}
+                <Ionicons name="log-out-outline" size={22} color="#DC2626" style={{ marginRight: 12 }} />
+                <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#DC2626' }}>
+                  Logout
                 </Text>
               </TouchableOpacity>
             </View>
-          </>
-        ) : activeTab === 'profile' ? (
-          /* Profile Tab View */
-          <View style={{ paddingTop: 8 }}>
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: '800',
-                color: '#111827',
-                marginBottom: 20,
-              }}
-            >
-              Account & Profile
-            </Text>
-
-            <View
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 20,
-                padding: 20,
-                alignItems: 'center',
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: '#F1F5F9',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.03,
-                shadowRadius: 6,
-                elevation: 1.5,
-              }}
-            >
+          ) : activeTab === 'payments' ? (
+            /* Payments Tab View: Reuses ScreenHeader and HeroGradientCard without reloading header */
+            <PaymentScreen
+              user={user}
+              isTab={true}
+              showHeader={false}
+              onNavigateHome={() => handleTabPress('home')}
+              onNavigateHistory={() => handleTabPress('history')}
+              onNavigateProfile={() => handleTabPress('profile')}
+              onOpenNotifications={() => setNotificationsVisible(true)}
+              onLogout={onLogout}
+            />
+          ) : activeTab === 'history' ? (
+            /* History Tab View */
+            <View style={{ paddingTop: 4 }}>
               <View
                 style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 36,
-                  backgroundColor: '#FFF2E8',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 12,
-                }}
-              >
-                <Ionicons name="person" size={36} color="#F57C00" />
-              </View>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#1E293B' }}>{userName}</Text>
-              <Text style={{ fontSize: 14, color: '#64748B', marginTop: 2 }}>
-                Room {roomNumber} • {user?.role || 'Resident'}
-              </Text>
-              {user?.mobileNumber ? (
-                <Text style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>
-                  +91 {user.mobileNumber}
-                </Text>
-              ) : null}
-            </View>
-
-            {/* Profile Action Options */}
-            {onChangePassword ? (
-              <TouchableOpacity
-                onPress={onChangePassword}
-                style={{
                   backgroundColor: '#FFFFFF',
-                  borderRadius: 16,
-                  padding: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginBottom: 12,
+                  borderRadius: 20,
+                  paddingHorizontal: 16,
+                  paddingVertical: 4,
                   borderWidth: 1,
                   borderColor: '#F1F5F9',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.03,
+                  shadowRadius: 6,
+                  elevation: 1.5,
                 }}
               >
-                <Ionicons name="key-outline" size={22} color="#F57C00" style={{ marginRight: 12 }} />
-                <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1E293B' }}>
-                  Change Password
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-              </TouchableOpacity>
-            ) : null}
-
-            {user?.role === 'ADMIN' && onNavigateAdmin ? (
-              <TouchableOpacity
-                onPress={onNavigateAdmin}
-                style={{
-                  backgroundColor: '#FFF7ED',
-                  borderRadius: 16,
-                  padding: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: '#FED7AA',
-                }}
-              >
-                <Ionicons name="shield-checkmark-outline" size={22} color="#EA580C" style={{ marginRight: 12 }} />
-                <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#EA580C' }}>
-                  Switch to Admin Dashboard
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color="#EA580C" />
-              </TouchableOpacity>
-            ) : null}
-
-            <TouchableOpacity
-              onPress={handleLogoutConfirm}
-              style={{
-                backgroundColor: '#FEF2F2',
-                borderRadius: 16,
-                padding: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: '#FEE2E2',
-                marginTop: 8,
-              }}
-            >
-              <Ionicons name="log-out-outline" size={22} color="#DC2626" style={{ marginRight: 12 }} />
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#DC2626' }}>
-                Logout
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : activeTab === 'payments' ? (
-          <PaymentScreen
-            user={user}
-            isTab={true}
-            onNavigateHome={() => setActiveTab('home')}
-            onNavigateHistory={() => setActiveTab('history')}
-            onNavigateProfile={() => setActiveTab('profile')}
-            onLogout={onLogout}
-          />
-        ) : activeTab === 'history' ? (
-          <View>
-            <View style={{ marginBottom: 18 }}>
-              <Text style={{ fontSize: 14, fontWeight: '500', color: '#64748B', marginBottom: 3 }}>
-                Records
-              </Text>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 }}>
-                Payment History
-              </Text>
+                {[
+                  { month: 'October 2026', amount: '₹500', status: 'pending', date: 'Today, 08:30 AM' },
+                  { month: 'September 2026', amount: '₹500', status: 'verified', date: '04 Sep, 2026' },
+                  { month: 'August 2026', amount: '₹500', status: 'verified', date: '05 Aug, 2026' },
+                  { month: 'July 2026', amount: '₹500', status: 'verified', date: '03 Jul, 2026' },
+                  { month: 'June 2026', amount: '₹500', status: 'verified', date: '05 Jun, 2026' },
+                ].map((item, idx) => {
+                  const isVerified = item.status === 'verified';
+                  return (
+                    <ActionRowCard
+                      key={idx}
+                      iconName={isVerified ? 'checkmark-circle' : 'time'}
+                      iconColor={isVerified ? '#16A34A' : '#D97706'}
+                      iconBgColor={isVerified ? '#DCFCE7' : '#FEF3C7'}
+                      title={`Room ${roomNumber} • ${item.month}`}
+                      subtitle={`${item.amount} • ${item.date}`}
+                      tagLabel={isVerified ? 'Verified' : 'Pending'}
+                      tagVariant={isVerified ? 'green' : 'amber'}
+                      showChevron={true}
+                      chevronColor="#94A3B8"
+                      showDivider={idx < 4}
+                    />
+                  );
+                })}
+              </View>
             </View>
-
-            <View
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 4,
-                borderWidth: 1,
-                borderColor: '#F1F5F9',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.03,
-                shadowRadius: 6,
-                elevation: 1.5,
-              }}
-            >
-              {[
-                { month: 'October 2026', amount: '₹500', status: 'pending', date: 'Today, 08:30 AM' },
-                { month: 'September 2026', amount: '₹500', status: 'verified', date: '04 Sep, 2026' },
-                { month: 'August 2026', amount: '₹500', status: 'verified', date: '05 Aug, 2026' },
-                { month: 'July 2026', amount: '₹500', status: 'verified', date: '03 Jul, 2026' },
-                { month: 'June 2026', amount: '₹500', status: 'verified', date: '05 Jun, 2026' },
-              ].map((item, idx) => {
-                const isVerified = item.status === 'verified';
-                return (
-                  <ActionRowCard
-                    key={idx}
-                    iconName={isVerified ? 'checkmark-circle' : 'time'}
-                    iconColor={isVerified ? '#16A34A' : '#D97706'}
-                    iconBgColor={isVerified ? '#DCFCE7' : '#FEF3C7'}
-                    title={`Room ${roomNumber} • ${item.month}`}
-                    subtitle={`${item.amount} • ${item.date}`}
-                    tagLabel={isVerified ? 'Verified' : 'Pending'}
-                    tagVariant={isVerified ? 'green' : 'amber'}
-                    showChevron={true}
-                    chevronColor="#94A3B8"
-                    showDivider={idx < 4}
-                  />
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
+          ) : null}
+        </Animated.View>
       </ScrollView>
 
-      {/* Bottom Navigation Bar */}
+      {/* Notifications Modal */}
+      <NotificationsModal
+        visible={notificationsVisible}
+        onClose={() => setNotificationsVisible(false)}
+      />
+
+      {/* Animated Bottom Navigation Bar */}
       <View
         style={{
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#F1F5F9',
-          paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+          paddingTop: 8,
+          paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 10),
           flexDirection: 'row',
           justifyContent: 'space-around',
           alignItems: 'center',
@@ -659,96 +692,140 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
       >
         {/* Tab 1: Home */}
         <TouchableOpacity
-          onPress={() => setActiveTab('home')}
+          onPress={() => handleTabPress('home')}
           activeOpacity={0.7}
-          style={{ alignItems: 'center', minWidth: 64 }}
+          style={{ alignItems: 'center', minWidth: 68 }}
         >
-          <Ionicons
-            name="home"
-            size={22}
-            color={activeTab === 'home' ? '#F57C00' : '#94A3B8'}
-          />
-          <Text
+          <Animated.View
             style={{
-              fontSize: 11.5,
-              fontWeight: activeTab === 'home' ? '700' : '500',
-              color: activeTab === 'home' ? '#F57C00' : '#94A3B8',
-              marginTop: 3,
+              alignItems: 'center',
+              transform: [{ scale: tabScaleAnims.home }],
+              paddingVertical: 4,
+              paddingHorizontal: 12,
+              borderRadius: 16,
+              backgroundColor: activeTab === 'home' ? '#FFF7ED' : 'transparent',
             }}
           >
-            Home
-          </Text>
+            <Ionicons
+              name={activeTab === 'home' ? 'home' : 'home-outline'}
+              size={22}
+              color={activeTab === 'home' ? '#F57C00' : '#94A3B8'}
+            />
+            <Text
+              style={{
+                fontSize: 11.5,
+                fontWeight: activeTab === 'home' ? '700' : '500',
+                color: activeTab === 'home' ? '#F57C00' : '#94A3B8',
+                marginTop: 2,
+              }}
+            >
+              Home
+            </Text>
+          </Animated.View>
         </TouchableOpacity>
 
         {/* Tab 2: Payments */}
         <TouchableOpacity
-          onPress={() => setActiveTab('payments')}
+          onPress={() => handleTabPress('payments')}
           activeOpacity={0.7}
-          style={{ alignItems: 'center', minWidth: 64 }}
+          style={{ alignItems: 'center', minWidth: 68 }}
         >
-          <Ionicons
-            name={activeTab === 'payments' ? 'card' : 'card-outline'}
-            size={22}
-            color={activeTab === 'payments' ? '#F57C00' : '#94A3B8'}
-          />
-          <Text
+          <Animated.View
             style={{
-              fontSize: 11.5,
-              fontWeight: activeTab === 'payments' ? '700' : '500',
-              color: activeTab === 'payments' ? '#F57C00' : '#94A3B8',
-              marginTop: 3,
+              alignItems: 'center',
+              transform: [{ scale: tabScaleAnims.payments }],
+              paddingVertical: 4,
+              paddingHorizontal: 12,
+              borderRadius: 16,
+              backgroundColor: activeTab === 'payments' ? '#FFF7ED' : 'transparent',
             }}
           >
-            Payments
-          </Text>
+            <Ionicons
+              name={activeTab === 'payments' ? 'card' : 'card-outline'}
+              size={22}
+              color={activeTab === 'payments' ? '#F57C00' : '#94A3B8'}
+            />
+            <Text
+              style={{
+                fontSize: 11.5,
+                fontWeight: activeTab === 'payments' ? '700' : '500',
+                color: activeTab === 'payments' ? '#F57C00' : '#94A3B8',
+                marginTop: 2,
+              }}
+            >
+              Payments
+            </Text>
+          </Animated.View>
         </TouchableOpacity>
 
         {/* Tab 3: History */}
         <TouchableOpacity
-          onPress={() => setActiveTab('history')}
+          onPress={() => handleTabPress('history')}
           activeOpacity={0.7}
-          style={{ alignItems: 'center', minWidth: 64 }}
+          style={{ alignItems: 'center', minWidth: 68 }}
         >
-          <Ionicons
-            name={activeTab === 'history' ? 'time' : 'time-outline'}
-            size={22}
-            color={activeTab === 'history' ? '#F57C00' : '#94A3B8'}
-          />
-          <Text
+          <Animated.View
             style={{
-              fontSize: 11.5,
-              fontWeight: activeTab === 'history' ? '700' : '500',
-              color: activeTab === 'history' ? '#F57C00' : '#94A3B8',
-              marginTop: 3,
+              alignItems: 'center',
+              transform: [{ scale: tabScaleAnims.history }],
+              paddingVertical: 4,
+              paddingHorizontal: 12,
+              borderRadius: 16,
+              backgroundColor: activeTab === 'history' ? '#FFF7ED' : 'transparent',
             }}
           >
-            History
-          </Text>
+            <Ionicons
+              name={activeTab === 'history' ? 'time' : 'time-outline'}
+              size={22}
+              color={activeTab === 'history' ? '#F57C00' : '#94A3B8'}
+            />
+            <Text
+              style={{
+                fontSize: 11.5,
+                fontWeight: activeTab === 'history' ? '700' : '500',
+                color: activeTab === 'history' ? '#F57C00' : '#94A3B8',
+                marginTop: 2,
+              }}
+            >
+              History
+            </Text>
+          </Animated.View>
         </TouchableOpacity>
 
         {/* Tab 4: Profile */}
         <TouchableOpacity
-          onPress={() => setActiveTab('profile')}
+          onPress={() => handleTabPress('profile')}
           activeOpacity={0.7}
-          style={{ alignItems: 'center', minWidth: 64 }}
+          style={{ alignItems: 'center', minWidth: 68 }}
         >
-          <Ionicons
-            name={activeTab === 'profile' ? 'person' : 'person-outline'}
-            size={22}
-            color={activeTab === 'profile' ? '#F57C00' : '#94A3B8'}
-          />
-          <Text
+          <Animated.View
             style={{
-              fontSize: 11.5,
-              fontWeight: activeTab === 'profile' ? '700' : '500',
-              color: activeTab === 'profile' ? '#F57C00' : '#94A3B8',
-              marginTop: 3,
+              alignItems: 'center',
+              transform: [{ scale: tabScaleAnims.profile }],
+              paddingVertical: 4,
+              paddingHorizontal: 12,
+              borderRadius: 16,
+              backgroundColor: activeTab === 'profile' ? '#FFF7ED' : 'transparent',
             }}
           >
-            Profile
-          </Text>
+            <Ionicons
+              name={activeTab === 'profile' ? 'person' : 'person-outline'}
+              size={22}
+              color={activeTab === 'profile' ? '#F57C00' : '#94A3B8'}
+            />
+            <Text
+              style={{
+                fontSize: 11.5,
+                fontWeight: activeTab === 'profile' ? '700' : '500',
+                color: activeTab === 'profile' ? '#F57C00' : '#94A3B8',
+                marginTop: 2,
+              }}
+            >
+              Profile
+            </Text>
+          </Animated.View>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

@@ -2,6 +2,7 @@ import './global.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, ActivityIndicator } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -84,7 +85,8 @@ export default function App() {
     : 'Welcome';
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <SafeAreaProvider>
+      <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
@@ -246,5 +248,6 @@ export default function App() {
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
-  );
+  </SafeAreaProvider>
+);
 }

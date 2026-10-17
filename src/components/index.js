@@ -9,3 +9,5 @@ export { default as ActionRowCard } from './ActionRowCard';
 export { default as DualStatCard } from './DualStatCard';
 export { default as QuickActionTile } from './QuickActionTile';
 export { default as NoticeBanner } from './NoticeBanner';
+export { default as ScreenHeader } from './ScreenHeader';
+export { default as NotificationsModal } from './NotificationsModal';

@@ -21,6 +21,8 @@ import {
   NoticeBanner,
   PrimaryButton,
   StatusTag,
+  ScreenHeader,
+  NotificationsModal,
 } from '../src/components';
 
 export default function PaymentScreen({
@@ -30,6 +32,8 @@ export default function PaymentScreen({
   onNavigateProfile,
   onLogout,
   isTab = false,
+  showHeader = !isTab,
+  onOpenNotifications,
 }) {
   const userName = user?.fullName || 'Pravin Kumar';
   const roomNumber = user?.roomNumber || '104';
@@ -125,134 +129,18 @@ export default function PaymentScreen({
 
   const content = (
     <>
-      {/* Top Bar Header: [House] Residency + Bell + Avatar */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 18,
-        }}
-      >
-        {/* Left: App Logo Badge + Title */}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 12,
-              backgroundColor: '#F57C00',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 10,
-              shadowColor: '#F57C00',
-              shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.3,
-              shadowRadius: 6,
-              elevation: 2,
-            }}
-          >
-            <Ionicons name="home" size={20} color="#FFFFFF" />
-          </View>
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: '800',
-              color: '#0F172A',
-              letterSpacing: -0.4,
-            }}
-          >
-            Residency
-          </Text>
-        </View>
-
-        {/* Right: Notification Bell + Avatar */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {/* Notification Bell with Orange Dot */}
-          <TouchableOpacity
-            onPress={() => setNotificationsVisible(true)}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.04,
-              shadowRadius: 6,
-              elevation: 1,
-              borderWidth: 1,
-              borderColor: '#F1F5F9',
-              position: 'relative',
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="notifications-outline" size={23} color="#1E293B" />
-            <View
-              style={{
-                position: 'absolute',
-                top: 10,
-                right: 11,
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: '#F97316',
-                borderWidth: 1.5,
-                borderColor: '#FFFFFF',
-              }}
-            />
-          </TouchableOpacity>
-
-          {/* User Avatar */}
-          <TouchableOpacity
-            onPress={onNavigateProfile}
-            activeOpacity={0.8}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              overflow: 'hidden',
-              borderWidth: 1.5,
-              borderColor: '#FED7AA',
-              backgroundColor: '#FFF7ED',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Image
-              source={require('../assets/user-avatar.jpg')}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Greeting & Screen Title */}
-      <View style={{ marginBottom: 18 }}>
-        <Text
-          style={{
-            fontSize: 15,
-            fontWeight: '500',
-            color: '#64748B',
-            marginBottom: 3,
-          }}
-        >
-          Good morning, {userName}
-        </Text>
-        <Text
-          style={{
-            fontSize: 32,
-            fontWeight: '800',
-            color: '#0F172A',
-            letterSpacing: -0.6,
-          }}
-        >
-          Payments
-        </Text>
-      </View>
+      {/* Reusable Header (only shown when standalone, not when inside Dashboard tab) */}
+      {showHeader && (
+        <ScreenHeader
+          user={user}
+          activeTab="payments"
+          showBack={!isTab}
+          onBack={onNavigateHome}
+          onPressNotifications={onOpenNotifications || (() => setNotificationsVisible(true))}
+          onPressAvatar={onNavigateProfile}
+          onPressLogo={onNavigateHome}
+        />
+      )}
 
       {/* Hero Current Maintenance Due Card */}
       <HeroGradientCard
