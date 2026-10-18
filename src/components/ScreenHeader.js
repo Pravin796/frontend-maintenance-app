@@ -129,82 +129,88 @@ const ScreenHeader = memo(function ScreenHeader({
           marginBottom: 16,
         }}
       >
-        {/* Left: Back button OR App Brand Logo */}
-        {showBack ? (
-          <TouchableOpacity
-            onPress={onBack}
-            activeOpacity={0.7}
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: 21,
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.04,
-              shadowRadius: 6,
-              elevation: 1,
-              borderWidth: 1,
-              borderColor: '#F1F5F9',
-            }}
-          >
-            <Ionicons name="arrow-back" size={20} color="#1E293B" />
-          </TouchableOpacity>
-        ) : showLogo ? (
-          <TouchableOpacity
-            onPress={onPressLogo}
-            activeOpacity={onPressLogo ? 0.7 : 1}
-            style={{ flexDirection: 'row', alignItems: 'center' }}
-          >
-            {/* Orange Home Icon Badge */}
-            <View
+        {/* Left: Back button AND/OR App Brand Logo */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {showBack && (
+            <TouchableOpacity
+              onPress={onBack}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{
                 width: 38,
                 height: 38,
-                borderRadius: 12,
-                backgroundColor: '#F57C00',
+                borderRadius: 19,
+                backgroundColor: '#FFFFFF',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginRight: 10,
-                shadowColor: '#F57C00',
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.3,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.04,
                 shadowRadius: 6,
-                elevation: 2,
+                elevation: 1,
+                borderWidth: 1,
+                borderColor: '#F1F5F9',
+                marginRight: 10,
               }}
             >
-              <Ionicons name="home" size={20} color="#FFFFFF" />
-            </View>
+              <Ionicons name="arrow-back" size={20} color="#1E293B" />
+            </TouchableOpacity>
+          )}
 
-            <View>
-              <Text
+          {showLogo && (
+            <TouchableOpacity
+              onPress={onPressLogo}
+              activeOpacity={onPressLogo ? 0.7 : 1}
+              style={{ flexDirection: 'row', alignItems: 'center' }}
+            >
+              {/* Orange Home Icon Badge */}
+              <View
                 style={{
-                  fontSize: 20,
-                  fontWeight: '800',
-                  color: '#0F172A',
-                  letterSpacing: -0.4,
-                  lineHeight: 24,
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  backgroundColor: '#F57C00',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 10,
+                  shadowColor: '#F57C00',
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 6,
+                  elevation: 2,
                 }}
               >
-                Residency
-              </Text>
-              <Text
-                style={{
-                  fontSize: 11.5,
-                  fontWeight: '600',
-                  color: '#94A3B8',
-                  marginTop: -1,
-                }}
-              >
-                Room {roomNumber}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ) : (
-          <View />
-        )}
+                <Ionicons name="home" size={20} color="#FFFFFF" />
+              </View>
+
+              <View>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: '800',
+                    color: '#0F172A',
+                    letterSpacing: -0.4,
+                    lineHeight: 24,
+                  }}
+                >
+                  Residency
+                </Text>
+                {!showBack && (
+                  <Text
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: '600',
+                      color: '#94A3B8',
+                      marginTop: -1,
+                    }}
+                  >
+                    Room {roomNumber}
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Right Actions: Notifications Bell + User Avatar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

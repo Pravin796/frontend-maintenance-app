@@ -21,6 +21,7 @@ import {
   NotificationsModal,
 } from '../src/components';
 import PaymentScreen from './PaymentScreen';
+import OnlinePaymentScreen from './OnlinePaymentScreen';
 
 const TAB_ORDER = ['home', 'payments', 'history', 'profile'];
 
@@ -31,8 +32,12 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   const [activeTab, setActiveTab] = useState('home');
   const [notificationsVisible, setNotificationsVisible] = useState(false);
 
-  // Horizontal pager animation for smooth, 100% flicker-free sliding
+  // Horizontal pager animation for smooth, 100% flicker-free sliding between tabs
   const pagerAnim = useRef(new Animated.Value(0)).current;
+
+  // Sub-page pager animation for Payments <-> Online Payment transition
+  const [paymentSubView, setPaymentSubView] = useState('main'); // 'main' | 'online'
+  const paymentSubPagerAnim = useRef(new Animated.Value(0)).current;
 
   // Separate scroll view refs for each tab
   const homeScrollRef = useRef(null);
@@ -55,7 +60,28 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   useEffect(() => {
     const idx = TAB_ORDER.indexOf(activeTab);
     pagerAnim.setValue(-idx * screenWidth);
-  }, [screenWidth, activeTab, pagerAnim]);
+    paymentSubPagerAnim.setValue(paymentSubView === 'online' ? -screenWidth : 0);
+  }, [screenWidth, activeTab, paymentSubView, pagerAnim, paymentSubPagerAnim]);
+
+  const handleOpenOnlinePayment = useCallback(() => {
+    setPaymentSubView('online');
+    Animated.timing(paymentSubPagerAnim, {
+      toValue: -screenWidth,
+      duration: 250,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: true,
+    }).start();
+  }, [screenWidth, paymentSubPagerAnim]);
+
+  const handleBackFromOnlinePayment = useCallback(() => {
+    setPaymentSubView('main');
+    Animated.timing(paymentSubPagerAnim, {
+      toValue: 0,
+      duration: 250,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: true,
+    }).start();
+  }, [paymentSubPagerAnim]);
 
   const handleLogoutConfirm = () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
@@ -112,10 +138,23 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
       <ScreenHeader
         user={user}
         activeTab={activeTab}
+        title={activeTab === 'payments' && paymentSubView === 'online' ? 'Online Payment' : undefined}
+        subtitle={
+          activeTab === 'payments' && paymentSubView === 'online'
+            ? 'Pay your maintenance securely using UPI'
+            : undefined
+        }
+        showBack={activeTab === 'payments' && paymentSubView === 'online'}
+        onBack={handleBackFromOnlinePayment}
         unreadCount={2}
         onPressNotifications={() => setNotificationsVisible(true)}
         onPressAvatar={() => handleTabPress('profile')}
-        onPressLogo={() => handleTabPress('home')}
+        onPressLogo={() => {
+          if (activeTab === 'payments' && paymentSubView === 'online') {
+            handleBackFromOnlinePayment();
+          }
+          handleTabPress('home');
+        }}
       />
 
       {/* Horizontal Sliding Pager Container (zero-flicker native translation) */}
@@ -197,7 +236,10 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                 variant="balance"
                 title="Outstanding Balance"
                 amount="₹1,500"
-                onActionPress={() => handleTabPress('payments')}
+                onActionPress={() => {
+                  handleTabPress('payments');
+                  handleOpenOnlinePayment();
+                }}
               />
 
               {/* Monthly Maintenance Card */}
@@ -358,7 +400,10 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                 {/* Tile 1: Make Payment */}
                 <TouchableOpacity
                   activeOpacity={0.82}
-                  onPress={() => handleTabPress('payments')}
+                  onPress={() => {
+                    handleTabPress('payments');
+                    handleOpenOnlinePayment();
+                  }}
                   style={{
                     flex: 1,
                     backgroundColor: '#FFFFFF',
@@ -502,28 +547,56 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
             </ScrollView>
           </View>
 
-          {/* TAB 1: PAYMENTS */}
-          <View style={{ width: screenWidth, flex: 1 }}>
-            <ScrollView
-              ref={paymentsScrollRef}
-              contentContainerStyle={{
-                paddingHorizontal: 20,
-                paddingTop: 8,
-                paddingBottom: 28,
+          {/* TAB 1: PAYMENTS (with horizontal slide to Online Payment) */}
+          <View style={{ width: screenWidth, flex: 1, overflow: 'hidden' }}>
+            <Animated.View
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                width: screenWidth * 2,
+                transform: [{ translateX: paymentSubPagerAnim }],
               }}
-              showsVerticalScrollIndicator={false}
             >
-              <PaymentScreen
-                user={user}
-                isTab={true}
-                showHeader={false}
-                onNavigateHome={() => handleTabPress('home')}
-                onNavigateHistory={() => handleTabPress('history')}
-                onNavigateProfile={() => handleTabPress('profile')}
-                onOpenNotifications={() => setNotificationsVisible(true)}
-                onLogout={onLogout}
-              />
-            </ScrollView>
+              {/* SUB-VIEW 0: Main Payments Screen */}
+              <View style={{ width: screenWidth, flex: 1 }}>
+                <ScrollView
+                  ref={paymentsScrollRef}
+                  contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: 8,
+                    paddingBottom: 28,
+                  }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <PaymentScreen
+                    user={user}
+                    isTab={true}
+                    showHeader={false}
+                    onNavigateOnlinePayment={handleOpenOnlinePayment}
+                    onNavigateHome={() => handleTabPress('home')}
+                    onNavigateHistory={() => handleTabPress('history')}
+                    onNavigateProfile={() => handleTabPress('profile')}
+                    onOpenNotifications={() => setNotificationsVisible(true)}
+                    onLogout={onLogout}
+                  />
+                </ScrollView>
+              </View>
+
+              {/* SUB-VIEW 1: Online Payment Screen (from screenshot) */}
+              <View style={{ width: screenWidth, flex: 1 }}>
+                <OnlinePaymentScreen
+                  user={user}
+                  outstandingAmount="₹1,500"
+                  billingMonth="October 2026"
+                  upiId="pravin@example@okaxis"
+                  recipientName="Residency Maintenance"
+                  onBack={handleBackFromOnlinePayment}
+                  onSubmitVerification={() => {
+                    handleBackFromOnlinePayment();
+                  }}
+                />
+              </View>
+            </Animated.View>
           </View>
 
           {/* TAB 2: HISTORY */}

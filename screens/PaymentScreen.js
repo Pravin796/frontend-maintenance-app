@@ -30,6 +30,7 @@ export default function PaymentScreen({
   onNavigateHome,
   onNavigateHistory,
   onNavigateProfile,
+  onNavigateOnlinePayment,
   onLogout,
   isTab = false,
   showHeader = !isTab,
@@ -150,8 +151,12 @@ export default function PaymentScreen({
         dueText="Due for October 2026"
         buttonText="Pay Now"
         onPayPress={() => {
-          setPayTab('online');
-          setPayModalVisible(true);
+          if (onNavigateOnlinePayment) {
+            onNavigateOnlinePayment();
+          } else {
+            setPayTab('online');
+            setPayModalVisible(true);
+          }
         }}
       />
 
@@ -201,8 +206,12 @@ export default function PaymentScreen({
           iconBgColor="#FEF3C7"
           arrowColor="#D97706"
           onPress={() => {
-            setPayTab('online');
-            setPayModalVisible(true);
+            if (onNavigateOnlinePayment) {
+              onNavigateOnlinePayment();
+            } else {
+              setPayTab('online');
+              setPayModalVisible(true);
+            }
           }}
         />
 
