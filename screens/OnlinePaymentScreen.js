@@ -251,8 +251,7 @@ export default function OnlinePaymentScreen({
           <View
             style={{
               flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
+              alignItems: 'center',
             }}
           >
             {/* Left side: Card icon + Outstanding Balance + Amount + Month */}
@@ -309,39 +308,6 @@ export default function OnlinePaymentScreen({
                   For {billingMonth}
                 </Text>
               </View>
-            </View>
-
-            {/* Right side: White pill Room 101 badge */}
-            <View
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 20,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                flexDirection: 'row',
-                alignItems: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 4,
-                elevation: 1.5,
-              }}
-            >
-              <Ionicons
-                name="home"
-                size={14}
-                color="#F57C00"
-                style={{ marginRight: 5 }}
-              />
-              <Text
-                style={{
-                  color: '#EA580C',
-                  fontSize: 12.5,
-                  fontWeight: '700',
-                }}
-              >
-                Room {roomNumber}
-              </Text>
             </View>
           </View>
         </LinearGradient>
@@ -404,311 +370,384 @@ export default function OnlinePaymentScreen({
           </View>
         </View>
 
-        {/* Two Columns Grid */}
-        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'stretch' }}>
-          {/* Left Column: QR Code + Apps */}
+        {/* Row 1: QR Code & Apps Section */}
+        <View
+          style={{
+            backgroundColor: '#F8FAFC',
+            borderRadius: 18,
+            padding: 16,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+            marginBottom: 14,
+          }}
+        >
+          {/* White QR Code container */}
           <View
             style={{
-              flex: 1,
-              backgroundColor: '#F8FAFC',
-              borderRadius: 18,
-              padding: 12,
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              backgroundColor: '#FFFFFF',
+              borderRadius: 16,
+              padding: 10,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 6,
+              elevation: 2,
               borderWidth: 1,
               borderColor: '#E2E8F0',
             }}
           >
-            {/* White QR Code container */}
-            <View
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 12,
-                padding: 6,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 4,
-                elevation: 1,
-                borderWidth: 1,
-                borderColor: '#E2E8F0',
-              }}
-            >
-              <QRCodeSvg size={106} />
-            </View>
-
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '700',
-                color: '#0F172A',
-                marginTop: 6,
-                marginBottom: 4,
-              }}
-            >
-              Scan to Pay
-            </Text>
-
-            {/* Divider */}
-            <Text style={{ fontSize: 11, color: '#94A3B8', marginBottom: 8 }}>
-              or
-            </Text>
-
-            {/* 4 UPI Apps Row */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                width: '100%',
-                paddingHorizontal: 2,
-              }}
-            >
-              {/* GPay */}
-              <TouchableOpacity
-                onPress={() => handleOpenUpiApp('Google Pay')}
-                activeOpacity={0.7}
-                style={{ alignItems: 'center' }}
-              >
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: '#FFFFFF',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.05,
-                    shadowRadius: 2,
-                    elevation: 1,
-                  }}
-                >
-                  <Ionicons name="logo-google" size={17} color="#4285F4" />
-                </View>
-                <Text style={{ fontSize: 10, fontWeight: '600', color: '#475569', marginTop: 3 }}>
-                  GPay
-                </Text>
-              </TouchableOpacity>
-
-              {/* PhonePe */}
-              <TouchableOpacity
-                onPress={() => handleOpenUpiApp('PhonePe')}
-                activeOpacity={0.7}
-                style={{ alignItems: 'center' }}
-              >
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: '#5F259F',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 2,
-                    elevation: 1,
-                  }}
-                >
-                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>
-                    पे
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 10, fontWeight: '600', color: '#475569', marginTop: 3 }}>
-                  PhonePe
-                </Text>
-              </TouchableOpacity>
-
-              {/* Paytm */}
-              <TouchableOpacity
-                onPress={() => handleOpenUpiApp('Paytm')}
-                activeOpacity={0.7}
-                style={{ alignItems: 'center' }}
-              >
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: '#00BAF2',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 2,
-                    elevation: 1,
-                  }}
-                >
-                  <Text style={{ color: '#FFFFFF', fontSize: 9.5, fontWeight: '900' }}>
-                    Pay
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 10, fontWeight: '600', color: '#475569', marginTop: 3 }}>
-                  Paytm
-                </Text>
-              </TouchableOpacity>
-
-              {/* More */}
-              <TouchableOpacity
-                onPress={() => handleOpenUpiApp('UPI App')}
-                activeOpacity={0.7}
-                style={{ alignItems: 'center' }}
-              >
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: '#FFFFFF',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                  }}
-                >
-                  <Ionicons name="ellipsis-horizontal" size={16} color="#64748B" />
-                </View>
-                <Text style={{ fontSize: 10, fontWeight: '600', color: '#475569', marginTop: 3 }}>
-                  More
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <QRCodeSvg size={135} />
           </View>
 
-          {/* Right Column: UPI Details + Blue Info Box */}
-          <View
+          <Text
             style={{
-              flex: 1.15,
-              backgroundColor: '#FFF8F1',
-              borderRadius: 18,
-              padding: 12,
-              borderWidth: 1,
-              borderColor: '#FEE5D0',
-              justifyContent: 'space-between',
+              fontSize: 13.5,
+              fontWeight: '700',
+              color: '#0F172A',
+              marginTop: 10,
             }}
           >
-            {/* Header: Shield Icon + UPI Details */}
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Ionicons
-                  name="shield-checkmark"
-                  size={16}
-                  color="#EA580C"
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={{
-                    fontSize: 13.5,
-                    fontWeight: '700',
-                    color: '#0F172A',
-                  }}
-                >
-                  UPI Details
-                </Text>
-              </View>
+            Scan to Pay
+          </Text>
 
-              {/* UPI ID */}
-              <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>
-                UPI ID
-              </Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 8,
-                }}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: '#0F172A',
-                    flex: 1,
-                    marginRight: 4,
-                  }}
-                >
-                  {upiId}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => handleCopy(upiId, 'UPI ID')}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <Ionicons name="copy-outline" size={15} color="#F57C00" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Recipient Name */}
-              <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>
-                Recipient Name
-              </Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: '#0F172A',
-                    flex: 1,
-                    marginRight: 4,
-                  }}
-                >
-                  {recipientName}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => handleCopy(recipientName, 'Recipient Name')}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <Ionicons name="copy-outline" size={15} color="#F57C00" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Light Blue Info Box */}
-            <View
+          {/* Divider with 'or' */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              width: '85%',
+              marginVertical: 12,
+            }}
+          >
+            <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+            <Text
               style={{
-                backgroundColor: '#EFF6FF',
-                borderColor: '#BAE6FD',
-                borderWidth: 1,
-                borderRadius: 12,
-                padding: 8,
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                marginTop: 10,
+                marginHorizontal: 12,
+                fontSize: 12,
+                fontWeight: '600',
+                color: '#94A3B8',
               }}
             >
-              <Ionicons
-                name="information-circle"
-                size={16}
-                color="#0284C7"
-                style={{ marginRight: 6, marginTop: 1 }}
-              />
-              <Text
+              or
+            </Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+          </View>
+
+          {/* 4 UPI Apps Row with spacious layout */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-around',
+              alignItems: 'center',
+              width: '100%',
+              paddingHorizontal: 6,
+            }}
+          >
+            {/* GPay */}
+            <TouchableOpacity
+              onPress={() => handleOpenUpiApp('Google Pay')}
+              activeOpacity={0.7}
+              style={{ alignItems: 'center' }}
+            >
+              <View
                 style={{
-                  fontSize: 10.5,
-                  color: '#0369A1',
-                  lineHeight: 14,
-                  flex: 1,
-                  fontWeight: '400',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: '#FFFFFF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 3,
+                  elevation: 1.5,
                 }}
               >
-                You can also open any UPI app and search for this UPI ID to pay.
-                Enter the amount manually in your UPI app.
+                <Ionicons name="logo-google" size={22} color="#4285F4" />
+              </View>
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: '600',
+                  color: '#475569',
+                  marginTop: 6,
+                }}
+              >
+                GPay
               </Text>
-            </View>
+            </TouchableOpacity>
+
+            {/* PhonePe */}
+            <TouchableOpacity
+              onPress={() => handleOpenUpiApp('PhonePe')}
+              activeOpacity={0.7}
+              style={{ alignItems: 'center' }}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: '#5F259F',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#5F259F',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 3,
+                  elevation: 2,
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>
+                  पे
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: '600',
+                  color: '#475569',
+                  marginTop: 6,
+                }}
+              >
+                PhonePe
+              </Text>
+            </TouchableOpacity>
+
+            {/* Paytm */}
+            <TouchableOpacity
+              onPress={() => handleOpenUpiApp('Paytm')}
+              activeOpacity={0.7}
+              style={{ alignItems: 'center' }}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: '#00BAF2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#00BAF2',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 3,
+                  elevation: 2,
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 11.5, fontWeight: '900' }}>
+                  Pay
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: '600',
+                  color: '#475569',
+                  marginTop: 6,
+                }}
+              >
+                Paytm
+              </Text>
+            </TouchableOpacity>
+
+            {/* More */}
+            <TouchableOpacity
+              onPress={() => handleOpenUpiApp('UPI App')}
+              activeOpacity={0.7}
+              style={{ alignItems: 'center' }}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: '#FFFFFF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 2,
+                  elevation: 1,
+                }}
+              >
+                <Ionicons name="ellipsis-horizontal" size={20} color="#64748B" />
+              </View>
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: '600',
+                  color: '#475569',
+                  marginTop: 6,
+                }}
+              >
+                More
+              </Text>
+            </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Row 2: UPI Details Section */}
+        <View
+          style={{
+            backgroundColor: '#FFF8F1',
+            borderRadius: 18,
+            padding: 16,
+            borderWidth: 1,
+            borderColor: '#FEE5D0',
+            marginBottom: 12,
+          }}
+        >
+          {/* Header: Shield Icon + UPI Details */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Ionicons
+              name="shield-checkmark"
+              size={18}
+              color="#EA580C"
+              style={{ marginRight: 7 }}
+            />
+            <Text
+              style={{
+                fontSize: 14.5,
+                fontWeight: '700',
+                color: '#0F172A',
+              }}
+            >
+              UPI Details
+            </Text>
+          </View>
+
+          {/* UPI ID */}
+          <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '500', marginBottom: 4 }}>
+            UPI ID
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#FFFFFF',
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              borderWidth: 1,
+              borderColor: '#FED7AA',
+              marginBottom: 12,
+            }}
+          >
+            <Text
+              selectable
+              style={{
+                fontSize: 13.5,
+                fontWeight: '700',
+                color: '#0F172A',
+                flex: 1,
+                marginRight: 8,
+              }}
+            >
+              {upiId}
+            </Text>
+            <TouchableOpacity
+              onPress={() => handleCopy(upiId, 'UPI ID')}
+              activeOpacity={0.7}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#FFF3E8',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 8,
+              }}
+            >
+              <Ionicons name="copy-outline" size={14} color="#EA580C" style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EA580C' }}>Copy</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Recipient Name */}
+          <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '500', marginBottom: 4 }}>
+            Recipient Name
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#FFFFFF',
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              borderWidth: 1,
+              borderColor: '#FED7AA',
+            }}
+          >
+            <Text
+              selectable
+              style={{
+                fontSize: 13.5,
+                fontWeight: '700',
+                color: '#0F172A',
+                flex: 1,
+                marginRight: 8,
+              }}
+            >
+              {recipientName}
+            </Text>
+            <TouchableOpacity
+              onPress={() => handleCopy(recipientName, 'Recipient Name')}
+              activeOpacity={0.7}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#FFF3E8',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 8,
+              }}
+            >
+              <Ionicons name="copy-outline" size={14} color="#EA580C" style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EA580C' }}>Copy</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Row 3: Light Blue Info Box */}
+        <View
+          style={{
+            backgroundColor: '#EFF6FF',
+            borderColor: '#BAE6FD',
+            borderWidth: 1,
+            borderRadius: 14,
+            padding: 12,
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+          }}
+        >
+          <Ionicons
+            name="information-circle"
+            size={18}
+            color="#0284C7"
+            style={{ marginRight: 8, marginTop: 1 }}
+          />
+          <Text
+            style={{
+              fontSize: 12,
+              color: '#0369A1',
+              lineHeight: 17,
+              flex: 1,
+              fontWeight: '400',
+            }}
+          >
+            You can also open any UPI app and search for this UPI ID to pay.
+            Enter the amount manually in your UPI app.
+          </Text>
         </View>
       </View>
 
@@ -802,89 +841,239 @@ export default function OnlinePaymentScreen({
         </View>
 
         {/* Upload screenshot container */}
-        <View
-          style={{
-            borderStyle: 'dashed',
-            borderWidth: 1.5,
-            borderColor: screenshotUri ? '#F57C00' : '#CBD5E1',
-            borderRadius: 14,
-            padding: 12,
-            backgroundColor: screenshotUri ? '#FFFBF7' : '#F8FAFC',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 16,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
-            {screenshotUri ? (
-              <Image
-                source={{ uri: screenshotUri }}
-                style={{ width: 38, height: 38, borderRadius: 8, marginRight: 10 }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 10,
-                  backgroundColor: '#EFF6FF',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 10,
-                }}
-              >
-                <Ionicons name="image-outline" size={20} color="#0284C7" />
-              </View>
-            )}
+        {!screenshotUri ? (
+          /* Empty State: Spacious stacked rows */
+          <TouchableOpacity
+            onPress={handlePickImage}
+            activeOpacity={0.75}
+            style={{
+              borderStyle: 'dashed',
+              borderWidth: 1.5,
+              borderColor: '#CBD5E1',
+              borderRadius: 16,
+              paddingVertical: 20,
+              paddingHorizontal: 16,
+              backgroundColor: '#F8FAFC',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+            }}
+          >
+            {/* Row 1: Upload icon */}
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: '#EFF6FF',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 10,
+              }}
+            >
+              <Ionicons name="cloud-upload-outline" size={24} color="#0284C7" />
+            </View>
 
-            <View style={{ flex: 1 }}>
+            {/* Row 2: Title & subtitle */}
+            <Text
+              style={{
+                fontSize: 13.5,
+                fontWeight: '700',
+                color: '#1E293B',
+                textAlign: 'center',
+                marginBottom: 3,
+              }}
+            >
+              Upload payment screenshot (optional)
+            </Text>
+            <Text
+              style={{
+                fontSize: 11.5,
+                color: '#64748B',
+                textAlign: 'center',
+                marginBottom: 14,
+              }}
+            >
+              JPG or PNG • Max 5 MB
+            </Text>
+
+            {/* Row 3: Choose Image button */}
+            <View
+              style={{
+                borderWidth: 1.5,
+                borderColor: '#EA580C',
+                backgroundColor: '#FFFFFF',
+                borderRadius: 22,
+                paddingHorizontal: 18,
+                paddingVertical: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 2,
+                elevation: 1,
+              }}
+            >
+              <Ionicons
+                name="image-outline"
+                size={16}
+                color="#EA580C"
+                style={{ marginRight: 6 }}
+              />
               <Text
                 style={{
                   fontSize: 12.5,
                   fontWeight: '700',
-                  color: '#1E293B',
+                  color: '#EA580C',
                 }}
               >
-                {screenshotUri ? 'Screenshot Attached' : 'Upload payment screenshot (optional)'}
-              </Text>
-              <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
-                {screenshotUri ? 'Tap choose image to replace' : 'JPG or PNG • Max 5 MB'}
+                Choose Image
               </Text>
             </View>
-          </View>
-
-          <TouchableOpacity
-            onPress={handlePickImage}
-            activeOpacity={0.8}
+          </TouchableOpacity>
+        ) : (
+          /* Attached State: Spacious stacked rows */
+          <View
             style={{
               borderWidth: 1.5,
-              borderColor: '#EA580C',
-              backgroundColor: '#FFFFFF',
-              borderRadius: 20,
-              paddingHorizontal: 12,
-              paddingVertical: 7,
-              flexDirection: 'row',
-              alignItems: 'center',
+              borderColor: '#FED7AA',
+              borderRadius: 16,
+              padding: 14,
+              backgroundColor: '#FFFBF7',
+              marginBottom: 16,
             }}
           >
-            <Ionicons
-              name="cloud-upload-outline"
-              size={15}
-              color="#EA580C"
-              style={{ marginRight: 5 }}
-            />
-            <Text
+            {/* Row 1: Screenshot Image Preview */}
+            <View
               style={{
-                fontSize: 11.5,
-                fontWeight: '700',
-                color: '#EA580C',
+                borderRadius: 12,
+                overflow: 'hidden',
+                backgroundColor: '#E2E8F0',
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
               }}
             >
-              Choose Image
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Image
+                source={{ uri: screenshotUri }}
+                style={{
+                  width: '100%',
+                  height: 150,
+                  borderRadius: 12,
+                }}
+                resizeMode="cover"
+              />
+            </View>
+
+            {/* Row 2: Status with Checkmark */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 12,
+                paddingHorizontal: 4,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={18}
+                  color="#16A34A"
+                  style={{ marginRight: 6 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#0F172A',
+                  }}
+                >
+                  Screenshot Attached
+                </Text>
+              </View>
+              <Text style={{ fontSize: 11, color: '#64748B' }}>
+                Ready to verify
+              </Text>
+            </View>
+
+            {/* Row 3: Action Buttons (Change Image & Remove) */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              {/* Change Image Button */}
+              <TouchableOpacity
+                onPress={handlePickImage}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  borderWidth: 1.5,
+                  borderColor: '#EA580C',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 12,
+                  paddingVertical: 9,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={15}
+                  color="#EA580C"
+                  style={{ marginRight: 6 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: '700',
+                    color: '#EA580C',
+                  }}
+                >
+                  Change Image
+                </Text>
+              </TouchableOpacity>
+
+              {/* Remove Button */}
+              <TouchableOpacity
+                onPress={() => setScreenshotUri(null)}
+                activeOpacity={0.8}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#FCA5A5',
+                  backgroundColor: '#FEF2F2',
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={15}
+                  color="#DC2626"
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: '700',
+                    color: '#DC2626',
+                  }}
+                >
+                  Remove
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Submit for Verification Button */}
         <TouchableOpacity
