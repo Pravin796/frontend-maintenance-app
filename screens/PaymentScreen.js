@@ -31,6 +31,7 @@ export default function PaymentScreen({
   onNavigateHistory,
   onNavigateProfile,
   onNavigateOnlinePayment,
+  onNavigateCashPayment,
   onLogout,
   isTab = false,
   showHeader = !isTab,
@@ -222,8 +223,12 @@ export default function PaymentScreen({
           iconBgColor="#FFF3E8"
           arrowColor="#EA580C"
           onPress={() => {
-            setPayTab('cash');
-            setPayModalVisible(true);
+            if (onNavigateCashPayment) {
+              onNavigateCashPayment();
+            } else {
+              setPayTab('cash');
+              setPayModalVisible(true);
+            }
           }}
         />
 

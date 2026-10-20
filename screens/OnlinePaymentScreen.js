@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import { useState, memo } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TextInput,
   Image,
   Alert,
-  Platform,
   Linking,
   ScrollView,
 } from 'react-native';

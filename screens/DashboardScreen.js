@@ -22,6 +22,7 @@ import {
 } from '../src/components';
 import PaymentScreen from './PaymentScreen';
 import OnlinePaymentScreen from './OnlinePaymentScreen';
+import CashPaymentScreen from './CashPaymentScreen';
 
 const TAB_ORDER = ['home', 'payments', 'history', 'profile'];
 
@@ -35,8 +36,8 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   // Horizontal pager animation for smooth, 100% flicker-free sliding between tabs
   const pagerAnim = useRef(new Animated.Value(0)).current;
 
-  // Sub-page pager animation for Payments <-> Online Payment transition
-  const [paymentSubView, setPaymentSubView] = useState('main'); // 'main' | 'online'
+  // Sub-page pager animation for Payments <-> Online Payment <-> Cash Payment transition
+  const [paymentSubView, setPaymentSubView] = useState('main'); // 'main' | 'online' | 'cash'
   const paymentSubPagerAnim = useRef(new Animated.Value(0)).current;
 
   // Separate scroll view refs for each tab
@@ -60,7 +61,13 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   useEffect(() => {
     const idx = TAB_ORDER.indexOf(activeTab);
     pagerAnim.setValue(-idx * screenWidth);
-    paymentSubPagerAnim.setValue(paymentSubView === 'online' ? -screenWidth : 0);
+    paymentSubPagerAnim.setValue(
+      paymentSubView === 'online'
+        ? -screenWidth
+        : paymentSubView === 'cash'
+        ? -2 * screenWidth
+        : 0
+    );
   }, [screenWidth, activeTab, paymentSubView, pagerAnim, paymentSubPagerAnim]);
 
   const handleOpenOnlinePayment = useCallback(() => {
@@ -73,7 +80,17 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
     }).start();
   }, [screenWidth, paymentSubPagerAnim]);
 
-  const handleBackFromOnlinePayment = useCallback(() => {
+  const handleOpenCashPayment = useCallback(() => {
+    setPaymentSubView('cash');
+    Animated.timing(paymentSubPagerAnim, {
+      toValue: -2 * screenWidth,
+      duration: 250,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: true,
+    }).start();
+  }, [screenWidth, paymentSubPagerAnim]);
+
+  const handleBackToMainPayments = useCallback(() => {
     setPaymentSubView('main');
     Animated.timing(paymentSubPagerAnim, {
       toValue: 0,
@@ -138,20 +155,28 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
       <ScreenHeader
         user={user}
         activeTab={activeTab}
-        title={activeTab === 'payments' && paymentSubView === 'online' ? 'Online Payment' : undefined}
+        title={
+          activeTab === 'payments' && paymentSubView === 'online'
+            ? 'Online Payment'
+            : activeTab === 'payments' && paymentSubView === 'cash'
+            ? 'Cash Payment'
+            : undefined
+        }
         subtitle={
           activeTab === 'payments' && paymentSubView === 'online'
             ? 'Pay your maintenance securely using UPI'
+            : activeTab === 'payments' && paymentSubView === 'cash'
+            ? 'Declare your cash payment to the admin. It will be verified and updated in your maintenance balance.'
             : undefined
         }
-        showBack={activeTab === 'payments' && paymentSubView === 'online'}
-        onBack={handleBackFromOnlinePayment}
+        showBack={activeTab === 'payments' && paymentSubView !== 'main'}
+        onBack={handleBackToMainPayments}
         unreadCount={2}
         onPressNotifications={() => setNotificationsVisible(true)}
         onPressAvatar={() => handleTabPress('profile')}
         onPressLogo={() => {
-          if (activeTab === 'payments' && paymentSubView === 'online') {
-            handleBackFromOnlinePayment();
+          if (activeTab === 'payments' && paymentSubView !== 'main') {
+            handleBackToMainPayments();
           }
           handleTabPress('home');
         }}
@@ -547,13 +572,13 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
             </ScrollView>
           </View>
 
-          {/* TAB 1: PAYMENTS (with horizontal slide to Online Payment) */}
+          {/* TAB 1: PAYMENTS (with horizontal slide to Online Payment & Cash Payment) */}
           <View style={{ width: screenWidth, flex: 1, overflow: 'hidden' }}>
             <Animated.View
               style={{
                 flex: 1,
                 flexDirection: 'row',
-                width: screenWidth * 2,
+                width: screenWidth * 3,
                 transform: [{ translateX: paymentSubPagerAnim }],
               }}
             >
@@ -573,6 +598,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                     isTab={true}
                     showHeader={false}
                     onNavigateOnlinePayment={handleOpenOnlinePayment}
+                    onNavigateCashPayment={handleOpenCashPayment}
                     onNavigateHome={() => handleTabPress('home')}
                     onNavigateHistory={() => handleTabPress('history')}
                     onNavigateProfile={() => handleTabPress('profile')}
@@ -590,9 +616,22 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   billingMonth="October 2026"
                   upiId="pravin@example@okaxis"
                   recipientName="Residency Maintenance"
-                  onBack={handleBackFromOnlinePayment}
+                  onBack={handleBackToMainPayments}
                   onSubmitVerification={() => {
-                    handleBackFromOnlinePayment();
+                    handleBackToMainPayments();
+                  }}
+                />
+              </View>
+
+              {/* SUB-VIEW 2: Cash Payment Screen (from screenshot) */}
+              <View style={{ width: screenWidth, flex: 1 }}>
+                <CashPaymentScreen
+                  user={user}
+                  outstandingAmount="₹1,500"
+                  defaultAmount="1000"
+                  onBack={handleBackToMainPayments}
+                  onSubmitCashPayment={() => {
+                    handleBackToMainPayments();
                   }}
                 />
               </View>
