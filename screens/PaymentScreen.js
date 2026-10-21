@@ -7,7 +7,6 @@ import {
   ScrollView,
   Platform,
   Alert,
-  Image,
   Modal,
   TextInput,
 } from 'react-native';
@@ -32,7 +31,6 @@ export default function PaymentScreen({
   onNavigateProfile,
   onNavigateOnlinePayment,
   onNavigateCashPayment,
-  onLogout,
   isTab = false,
   showHeader = !isTab,
   onOpenNotifications,
@@ -201,7 +199,7 @@ export default function PaymentScreen({
         }}
       >
         <QuickActionTile
-          title={'Online\nPayment'}
+          title={'Online Payment'}
           iconName="qr-code-outline"
           iconColor="#D97706"
           iconBgColor="#FEF3C7"
@@ -217,7 +215,7 @@ export default function PaymentScreen({
         />
 
         <QuickActionTile
-          title={'Cash\nPayment'}
+          title={'Cash Payment'}
           iconName="cash-outline"
           iconColor="#EA580C"
           iconBgColor="#FFF3E8"
@@ -232,20 +230,6 @@ export default function PaymentScreen({
           }}
         />
 
-        <QuickActionTile
-          title={'Payment\nHistory'}
-          iconName="time-outline"
-          iconColor="#0284C7"
-          iconBgColor="#E0F2FE"
-          arrowColor="#0284C7"
-          onPress={() => {
-            if (onNavigateHistory) {
-              onNavigateHistory();
-            } else {
-              setHistoryModalVisible(true);
-            }
-          }}
-        />
       </View>
 
       {/* Recent Payments Section */}
@@ -927,85 +911,11 @@ export default function PaymentScreen({
         </View>
       </Modal>
 
-      {/* Notifications Modal */}
-      <Modal
+      {/* Reusable Notifications Modal */}
+      <NotificationsModal
         visible={notificationsVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setNotificationsVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'flex-end',
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              padding: 24,
-              maxHeight: '75%',
-            }}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 18,
-              }}
-            >
-              <Text style={{ fontSize: 20, fontWeight: '800', color: '#0F172A' }}>
-                Notifications
-              </Text>
-              <TouchableOpacity onPress={() => setNotificationsVisible(false)}>
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ gap: 12, marginBottom: 20 }}>
-                <View
-                  style={{
-                    padding: 14,
-                    borderRadius: 14,
-                    backgroundColor: '#FFF7ED',
-                    borderLeftWidth: 4,
-                    borderLeftColor: '#F57C00',
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#9A3412' }}>
-                    Maintenance Bill for October
-                  </Text>
-                  <Text style={{ fontSize: 12.5, color: '#C2410C', marginTop: 2 }}>
-                    Monthly maintenance of ₹500 is due on 05 October 2026.
-                  </Text>
-                </View>
-
-                <View
-                  style={{
-                    padding: 14,
-                    borderRadius: 14,
-                    backgroundColor: '#DCFCE7',
-                    borderLeftWidth: 4,
-                    borderLeftColor: '#16A34A',
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#166534' }}>
-                    September Payment Verified
-                  </Text>
-                  <Text style={{ fontSize: 12.5, color: '#15803D', marginTop: 2 }}>
-                    Your payment of ₹500 was verified and approved by the admin.
-                  </Text>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setNotificationsVisible(false)}
+      />
     </>
   );
 }
