@@ -38,6 +38,9 @@ const ScreenHeader = memo(function ScreenHeader({
   activeTab = 'home',
   title,
   subtitle,
+  brandTitle,
+  brandSubtitle,
+  avatarSource,
   showLogo = true,
   showAvatar = true,
   showNotifications = true,
@@ -49,7 +52,8 @@ const ScreenHeader = memo(function ScreenHeader({
   onPressLogo,
   style,
 }) {
-  const userName = user?.fullName || 'Pravin Kumar';
+  const isAdmin = user?.role === 'ADMIN';
+  const userName = user?.fullName || (isAdmin ? 'Admin' : 'Pravin Kumar');
   const roomNumber = user?.roomNumber || '104';
 
   // Animated values for smooth title crossfade on tab switch
@@ -60,24 +64,47 @@ const ScreenHeader = memo(function ScreenHeader({
   let dynamicTitle = title;
 
   if (!dynamicTitle || !dynamicSubtitle) {
-    switch (activeTab) {
-      case 'payments':
-        dynamicSubtitle = dynamicSubtitle || `Good morning, ${userName}`;
-        dynamicTitle = dynamicTitle || 'Payments';
-        break;
-      case 'history':
-        dynamicSubtitle = dynamicSubtitle || 'Records & Statements';
-        dynamicTitle = dynamicTitle || 'Payment History';
-        break;
-      case 'profile':
-        dynamicSubtitle = dynamicSubtitle || 'Settings & Details';
-        dynamicTitle = dynamicTitle || 'Account & Profile';
-        break;
-      case 'home':
-      default:
-        dynamicSubtitle = dynamicSubtitle || 'Good morning,';
-        dynamicTitle = dynamicTitle || `${userName} 👋`;
-        break;
+    if (isAdmin) {
+      switch (activeTab) {
+        case 'payments':
+          dynamicSubtitle = dynamicSubtitle || 'Management';
+          dynamicTitle = dynamicTitle || 'Payment Reviews';
+          break;
+        case 'rooms':
+          dynamicSubtitle = dynamicSubtitle || 'Directory';
+          dynamicTitle = dynamicTitle || 'Residency Rooms';
+          break;
+        case 'profile':
+          dynamicSubtitle = dynamicSubtitle || 'Account';
+          dynamicTitle = dynamicTitle || 'Admin Profile';
+          break;
+        case 'dashboard':
+        case 'home':
+        default:
+          dynamicSubtitle = dynamicSubtitle || 'Good morning, Admin';
+          dynamicTitle = dynamicTitle || 'Dashboard';
+          break;
+      }
+    } else {
+      switch (activeTab) {
+        case 'payments':
+          dynamicSubtitle = dynamicSubtitle || `Good morning, ${userName}`;
+          dynamicTitle = dynamicTitle || 'Payments';
+          break;
+        case 'history':
+          dynamicSubtitle = dynamicSubtitle || 'Records & Statements';
+          dynamicTitle = dynamicTitle || 'Payment History';
+          break;
+        case 'profile':
+          dynamicSubtitle = dynamicSubtitle || 'Settings & Details';
+          dynamicTitle = dynamicTitle || 'Account & Profile';
+          break;
+        case 'home':
+        default:
+          dynamicSubtitle = dynamicSubtitle || 'Good morning,';
+          dynamicTitle = dynamicTitle || `${userName} 👋`;
+          break;
+      }
     }
   }
 
@@ -193,9 +220,9 @@ const ScreenHeader = memo(function ScreenHeader({
                     lineHeight: 24,
                   }}
                 >
-                  Residency
+                  {brandTitle || (isAdmin ? 'Residency Admin' : 'Residency')}
                 </Text>
-                {!showBack && (
+                {!showBack && (brandSubtitle !== undefined ? Boolean(brandSubtitle) : !isAdmin) && (
                   <Text
                     style={{
                       fontSize: 11.5,
@@ -204,7 +231,7 @@ const ScreenHeader = memo(function ScreenHeader({
                       marginTop: -1,
                     }}
                   >
-                    Room {roomNumber}
+                    {brandSubtitle || `Room ${roomNumber}`}
                   </Text>
                 )}
               </View>
@@ -278,7 +305,12 @@ const ScreenHeader = memo(function ScreenHeader({
               }}
             >
               <Image
-                source={require('../../assets/user-avatar.jpg')}
+                source={
+                  avatarSource ||
+                  (isAdmin
+                    ? require('../../assets/admin-avatar.jpg')
+                    : require('../../assets/user-avatar.jpg'))
+                }
                 style={{ width: '100%', height: '100%' }}
                 resizeMode="cover"
               />
@@ -314,7 +346,7 @@ const ScreenHeader = memo(function ScreenHeader({
         </Text>
         <Text
           style={{
-            fontSize: activeTab === 'home' ? 24 : 30,
+            fontSize: activeTab === 'home' && !isAdmin ? 24 : 28,
             fontWeight: '800',
             color: '#0F172A',
             letterSpacing: -0.5,
