@@ -26,6 +26,7 @@ import {
 
 export default function PaymentScreen({
   user,
+  dashboardData,
   onNavigateHome,
   onNavigateHistory,
   onNavigateProfile,
@@ -34,9 +35,67 @@ export default function PaymentScreen({
   isTab = false,
   showHeader = !isTab,
   onOpenNotifications,
+  onRefresh,
 }) {
-  const userName = user?.fullName || 'Pravin Kumar';
-  const roomNumber = user?.roomNumber || '104';
+  const userName = dashboardData?.residentName || user?.fullName || 'Pravin Kumar';
+  const roomNumber = dashboardData?.roomNumber || user?.roomNumber || '104';
+
+  const outstandingDisplay = dashboardData?.outstandingBalance != null
+    ? `₹${Number(dashboardData.outstandingBalance).toLocaleString('en-IN')}`
+    : '₹1,500';
+
+  const dueDisplay = dashboardData?.currentMaintenance?.amount != null
+    ? `₹${Number(dashboardData.currentMaintenance.amount).toLocaleString('en-IN')}`
+    : dashboardData?.maintenanceRate != null
+    ? `₹${Number(dashboardData.maintenanceRate).toLocaleString('en-IN')}`
+    : '₹500';
+
+  const formatBillingMonth = (billingMonth) => {
+    if (!billingMonth) return 'Current Month';
+    if (typeof billingMonth === 'string') {
+      const parts = billingMonth.split('-');
+      if (parts.length === 2) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const d = new Date(year, month, 1);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+        }
+      }
+    }
+    return String(billingMonth);
+  };
+
+  const dueBillingMonth = dashboardData?.currentMaintenance?.billingMonth
+    ? formatBillingMonth(dashboardData.currentMaintenance.billingMonth)
+    : 'October 2026';
+
+  const lastPaymentDisplay = dashboardData?.recentPayment?.amount != null
+    ? `₹${Number(dashboardData.recentPayment.amount).toLocaleString('en-IN')}`
+    : '₹500';
+
+  const formatPaymentDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return String(dateStr);
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return String(dateStr);
+    }
+  };
+
+  const lastPaymentSubtext = dashboardData?.recentPayment
+    ? `${formatPaymentDate(dashboardData.recentPayment.createdAt)} • ${dashboardData.recentPayment.status === 'VERIFIED' ? 'Verified' : dashboardData.recentPayment.status || 'Pending'}`
+    : 'September 2026 • Verified';
+
+  const lastPaymentVerified = dashboardData?.recentPayment
+    ? dashboardData.recentPayment.status === 'VERIFIED'
+    : true;
 
   // Modals state
   const [payModalVisible, setPayModalVisible] = useState(false);
@@ -146,8 +205,8 @@ export default function PaymentScreen({
       <HeroGradientCard
         variant="due"
         title="Current Maintenance Due"
-        amount="₹500"
-        dueText="Due for October 2026"
+        amount={dueDisplay}
+        dueText={`Due for ${dueBillingMonth}`}
         buttonText="Pay Now"
         onPayPress={() => {
           if (onNavigateOnlinePayment) {
@@ -162,14 +221,25 @@ export default function PaymentScreen({
       {/* Dual Stats Summary Card: Last Payment & Outstanding Balance */}
       <DualStatCard
         leftLabel="Last Payment"
-        leftValue="₹500"
-        leftSubtext="September 2026 • Verified"
-        leftVerified={true}
+        leftValue={lastPaymentDisplay}
+        leftSubtext={lastPaymentSubtext}
+        leftVerified={lastPaymentVerified}
         onLeftPress={() => {
-          setSelectedPayment(recentPayments[0]);
+          if (dashboardData?.recentPayment) {
+            setSelectedPayment({
+              room: roomNumber,
+              month: 'Recent Payment',
+              amount: lastPaymentDisplay,
+              status: (dashboardData.recentPayment.status || 'VERIFIED').toLowerCase(),
+              method: dashboardData.recentPayment.method,
+              date: formatPaymentDate(dashboardData.recentPayment.createdAt),
+            });
+          } else {
+            setSelectedPayment(recentPayments[0]);
+          }
         }}
         rightLabel="Outstanding Balance"
-        rightValue="₹1,500"
+        rightValue={outstandingDisplay}
         rightSubtext="Includes pending months"
         onRightPress={() => {
           setHistoryModalVisible(true);
