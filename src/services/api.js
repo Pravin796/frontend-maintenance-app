@@ -38,6 +38,12 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+let onUnauthorizedCallback = null;
+
+export const setUnauthorizedHandler = (callback) => {
+  onUnauthorizedCallback = callback;
+};
+
 api.interceptors.response.use(
   (response) => {
     console.log(
@@ -46,13 +52,28 @@ api.interceptors.response.use(
 
     return response;
   },
-  (error) => {
+  async (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+
     console.log('[API ERROR]', {
-      url: error.config?.url,
-      status: error.response?.status,
+      url,
+      status,
       message: error.message,
       data: error.response?.data,
     });
+
+    // If 401 on an authenticated endpoint (not login or register), token is expired/invalid
+    if (status === 401 && !url.includes('/auth/login') && !url.includes('/auth/register')) {
+      try {
+        await tokenStorage.clearAuth();
+      } catch {
+        // Ignore storage error during cleanup
+      }
+      if (typeof onUnauthorizedCallback === 'function') {
+        onUnauthorizedCallback(error);
+      }
+    }
 
     return Promise.reject(error);
   }
