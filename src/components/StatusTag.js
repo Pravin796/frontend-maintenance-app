@@ -30,6 +30,10 @@ const VARIANT_STYLES = {
     bg: '#F1F5F9',
     text: '#64748B',
   },
+  purple: {
+    bg: '#F3E8FF',
+    text: '#9333EA',
+  },
 };
 
 /**

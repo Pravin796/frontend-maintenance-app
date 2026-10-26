@@ -11,6 +11,12 @@ export const api = axios.create({
   },
 });
 
+let onUnauthorizedCallback = null;
+
+export const setUnauthorizedHandler = (callback) => {
+  onUnauthorizedCallback = callback;
+};
+
 api.interceptors.request.use(
   async (config) => {
     try {
@@ -44,57 +50,20 @@ api.interceptors.response.use(
     console.log(`[API Response] ${response.status} ${method} ${fullUrl}`, response.data);
     return response;
   },
-  (error) => {
+  async (error) => {
     const method = (error.config?.method || 'unknown').toUpperCase();
     const fullUrl = error.config
       ? `${error.config.baseURL || ''}${error.config.url || ''}`
       : 'unknown url';
-    console.error(`[API Response Error] ${error.response?.status || 'Error'} ${method} ${fullUrl}`, {
-      message: error.message,
-      data: error.response?.data,
-    });
-    return Promise.reject(error);
-  }
-);
-
-api.interceptors.request.use(
-  (config) => {
-    console.log(
-      `[API REQUEST] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`
-    );
-
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-let onUnauthorizedCallback = null;
-
-export const setUnauthorizedHandler = (callback) => {
-  onUnauthorizedCallback = callback;
-};
-
-api.interceptors.response.use(
-  (response) => {
-    console.log(
-      `[API RESPONSE] ${response.status} ${response.config.url}`
-    );
-
-    return response;
-  },
-  async (error) => {
     const status = error.response?.status;
-    const url = error.config?.url || '';
 
-    console.log('[API ERROR]', {
-      url,
-      status,
+    console.error(`[API Response Error] ${status || 'Error'} ${method} ${fullUrl}`, {
       message: error.message,
       data: error.response?.data,
     });
 
     // If 401 on an authenticated endpoint (not login or register), token is expired/invalid
-    if (status === 401 && !url.includes('/auth/login') && !url.includes('/auth/register')) {
+    if (status === 401 && !fullUrl.includes('/auth/login') && !fullUrl.includes('/auth/register')) {
       try {
         await tokenStorage.clearAuth();
       } catch {
@@ -119,5 +88,177 @@ export const getUserDashboard = async () => {
 
 export const userApi = {
   getUserDashboard,
+};
+
+/**
+ * Admin Dashboard API
+ */
+export const getAdminDashboard = async () => {
+  const response = await api.get('/admin/dashboard');
+  return response.data;
+};
+
+/**
+ * Cash Payment Requests API
+ */
+export const getPendingCashRequests = async () => {
+  const response = await api.get('/cash-payments/admin/pending');
+  return response.data;
+};
+
+export const verifyCashRequest = async (requestId, payload) => {
+  const response = await api.post(`/cash-payments/${requestId}/verify`, payload);
+  return response.data;
+};
+
+export const rejectCashRequest = async (requestId, adminNote) => {
+  const response = await api.post(`/cash-payments/${requestId}/reject`, null, {
+    params: adminNote ? { adminNote } : undefined,
+  });
+  return response.data;
+};
+
+export const getCashRequestById = async (requestId) => {
+  const response = await api.get(`/cash-payments/${requestId}`);
+  return response.data;
+};
+
+export const getCashRequestsByRoom = async (roomId) => {
+  const response = await api.get(`/cash-payments/room/${roomId}`);
+  return response.data;
+};
+
+/**
+ * Online Payments API
+ */
+export const getPendingOnlinePayments = async () => {
+  const response = await api.get('/payments/admin/pending');
+  return response.data;
+};
+
+export const verifyOnlinePayment = async (paymentId) => {
+  const response = await api.put(`/payments/${paymentId}/verify`);
+  return response.data;
+};
+
+export const rejectOnlinePayment = async (paymentId) => {
+  const response = await api.post(`/payments/${paymentId}/reject`);
+  return response.data;
+};
+
+export const getPaymentById = async (paymentId) => {
+  const response = await api.get(`/payments/${paymentId}`);
+  return response.data;
+};
+
+export const getPaymentsByRoom = async (roomId) => {
+  const response = await api.get(`/payments/room/${roomId}`);
+  return response.data;
+};
+
+/**
+ * Payment Allocations API
+ */
+export const createPaymentAllocation = async (payload) => {
+  const response = await api.post('/payment-allocations', payload);
+  return response.data;
+};
+
+export const getAllocationsByPayment = async (paymentId) => {
+  const response = await api.get(`/payment-allocations/payment/${paymentId}`);
+  return response.data;
+};
+
+export const getAllocationsByMaintenance = async (maintenanceId) => {
+  const response = await api.get(`/payment-allocations/maintenance/${maintenanceId}`);
+  return response.data;
+};
+
+/**
+ * Maintenance API
+ */
+export const getMaintenanceByRoom = async (roomId) => {
+  const response = await api.get(`/maintenance/room/${roomId}`);
+  return response.data;
+};
+
+export const getMaintenanceByRoomAndMonth = async (roomId, billingMonth) => {
+  const response = await api.get(`/maintenance/room/${roomId}/month/${billingMonth}`);
+  return response.data;
+};
+
+/**
+ * Rooms API
+ */
+export const getAllRooms = async () => {
+  const response = await api.get('/rooms');
+  return response.data;
+};
+
+export const getRoomById = async (roomId) => {
+  const response = await api.get(`/rooms/id/${roomId}`);
+  return response.data;
+};
+
+export const getRoomByNumber = async (roomNumber) => {
+  const response = await api.get(`/rooms/${roomNumber}`);
+  return response.data;
+};
+
+export const createRoom = async ({ roomNumber, maintenanceExempt = false }) => {
+  const response = await api.post('/rooms', { roomNumber, maintenanceExempt });
+  return response.data;
+};
+
+export const updateRoomExemption = async (roomId, maintenanceExempt) => {
+  const response = await api.patch(`/rooms/${roomId}/exemption`, null, {
+    params: { maintenanceExempt },
+  });
+  return response.data;
+};
+
+/**
+ * Resident & User Administration API (Admin only)
+ */
+export const getAllResidents = async () => {
+  const response = await api.get('/admin/users');
+  return response.data;
+};
+
+export const getResidentByRoomId = async (roomId) => {
+  const response = await api.get(`/admin/users/room/${roomId}`);
+  return response.data;
+};
+
+export const resetResidentPassword = async (userId) => {
+  const response = await api.post(`/admin/users/${userId}/reset-password`);
+  return response.data;
+};
+
+export const adminApi = {
+  getAdminDashboard,
+  getPendingCashRequests,
+  verifyCashRequest,
+  rejectCashRequest,
+  getCashRequestById,
+  getCashRequestsByRoom,
+  getPendingOnlinePayments,
+  verifyOnlinePayment,
+  rejectOnlinePayment,
+  getPaymentById,
+  getPaymentsByRoom,
+  createPaymentAllocation,
+  getAllocationsByPayment,
+  getAllocationsByMaintenance,
+  getMaintenanceByRoom,
+  getMaintenanceByRoomAndMonth,
+  getAllRooms,
+  getRoomById,
+  getRoomByNumber,
+  createRoom,
+  updateRoomExemption,
+  getAllResidents,
+  getResidentByRoomId,
+  resetResidentPassword,
 };
 
