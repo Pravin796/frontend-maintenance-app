@@ -15,6 +15,7 @@ import PaymentScreen from './screens/PaymentScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import { Asset } from 'expo-asset';
 import { authService } from './src/services/authService';
+import { setUnauthorizedHandler } from './src/services/api';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,6 +23,27 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const navigationRef = useRef(null);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // Continue clearing local state
+    }
+    setCurrentUser(null);
+    if (navigationRef.current) {
+      navigationRef.current.reset({
+        index: 0,
+        routes: [{ name: 'Welcome' }],
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      handleLogout();
+    });
+  }, [handleLogout]);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -51,21 +73,6 @@ export default function App() {
 
     initializeApp();
   }, []);
-
-  const handleLogout = async () => {
-    try {
-      await authService.logout();
-    } catch {
-      // Continue clearing local state
-    }
-    setCurrentUser(null);
-    if (navigationRef.current) {
-      navigationRef.current.reset({
-        index: 0,
-        routes: [{ name: 'Welcome' }],
-      });
-    }
-  };
 
   if (isRestoringSession) {
     return (

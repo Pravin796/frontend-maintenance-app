@@ -9,6 +9,8 @@ import {
   Animated,
   Easing,
   useWindowDimensions,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -23,6 +25,7 @@ import {
 import PaymentScreen from './PaymentScreen';
 import OnlinePaymentScreen from './OnlinePaymentScreen';
 import CashPaymentScreen from './CashPaymentScreen';
+import { getUserDashboard } from '../src/services/api';
 
 const TAB_ORDER = ['home', 'payments', 'history', 'profile'];
 
@@ -54,8 +57,91 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
     profile: new Animated.Value(1),
   }).current;
 
-  const userName = user?.fullName || 'Pravin Kumar';
-  const roomNumber = user?.roomNumber || '104';
+  // Live dashboard API state
+  const [dashboardData, setDashboardData] = useState(null);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dashboardError, setDashboardError] = useState(null);
+
+  const fetchDashboardData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoadingDashboard(true);
+    }
+    setDashboardError(null);
+    try {
+      const data = await getUserDashboard();
+      console.log(data);
+      if (data) {
+        setDashboardData(data);
+      }
+    } catch (err) {
+      console.log(err.message)
+      console.warn('Failed to load user dashboard:', err?.message || err);
+      setDashboardError(
+        err?.response?.data?.message || err?.message || 'Unable to connect to dashboard server'
+      );
+    } finally {
+      setIsLoadingDashboard(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData(false);
+  }, [fetchDashboardData]);
+
+  // Formatters and helpers
+  const formatCurrency = (val) => {
+    if (val == null || isNaN(val)) return '₹0';
+    return `₹${Number(val).toLocaleString('en-IN')}`;
+  };
+
+  const formatBillingMonth = (billingMonth) => {
+    if (!billingMonth) return 'Current Month';
+    if (typeof billingMonth === 'string') {
+      const parts = billingMonth.split('-');
+      if (parts.length === 2) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const d = new Date(year, month, 1);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+        }
+      }
+    }
+    if (Array.isArray(billingMonth) && billingMonth.length >= 2) {
+      const d = new Date(billingMonth[0], billingMonth[1] - 1, 1);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      }
+    }
+    return String(billingMonth);
+  };
+
+  const formatPaymentDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return String(dateStr);
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return String(dateStr);
+    }
+  };
+
+  // Resolved dynamic values from API with fallbacks
+  const userName = dashboardData?.residentName || user?.fullName || 'Pravin Kumar';
+  const roomNumber = dashboardData?.roomNumber || user?.roomNumber || '101';
+  const maintenanceRate = dashboardData?.maintenanceRate != null ? Number(dashboardData.maintenanceRate) : 500;
+  const outstandingBalance = dashboardData?.outstandingBalance != null ? Number(dashboardData.outstandingBalance) : 1000;
+  const currentMaintenance = dashboardData?.currentMaintenance || null;
+  const recentPayment = dashboardData?.recentPayment || null;
 
   // Keep pager aligned if screen orientation or dimensions change
   useEffect(() => {
@@ -65,8 +151,8 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
       paymentSubView === 'online'
         ? -screenWidth
         : paymentSubView === 'cash'
-        ? -2 * screenWidth
-        : 0
+          ? -2 * screenWidth
+          : 0
     );
   }, [screenWidth, activeTab, paymentSubView, pagerAnim, paymentSubPagerAnim]);
 
@@ -153,21 +239,25 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
 
       {/* Persistent Reusable Screen Header: stays mounted, smoothly updates text/data */}
       <ScreenHeader
-        user={user}
+        user={{
+          ...user,
+          fullName: userName,
+          roomNumber,
+        }}
         activeTab={activeTab}
         title={
           activeTab === 'payments' && paymentSubView === 'online'
             ? 'Online Payment'
             : activeTab === 'payments' && paymentSubView === 'cash'
-            ? 'Cash Payment'
-            : undefined
+              ? 'Cash Payment'
+              : undefined
         }
         subtitle={
           activeTab === 'payments' && paymentSubView === 'online'
             ? 'Pay your maintenance securely using UPI'
             : activeTab === 'payments' && paymentSubView === 'cash'
-            ? 'Declare your cash payment to the admin. It will be verified and updated in your maintenance balance.'
-            : undefined
+              ? 'Declare your cash payment to the admin. It will be verified and updated in your maintenance balance.'
+              : undefined
         }
         showBack={activeTab === 'payments' && paymentSubView !== 'main'}
         onBack={handleBackToMainPayments}
@@ -202,7 +292,47 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                 paddingBottom: 28,
               }}
               showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={() => fetchDashboardData(true)}
+                  tintColor="#F57C00"
+                  colors={['#F57C00']}
+                />
+              }
             >
+              {/* Optional Error / Retry Notice Banner if request failed */}
+              {dashboardError && !dashboardData && (
+                <View
+                  style={{
+                    backgroundColor: '#FEF2F2',
+                    borderRadius: 16,
+                    padding: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 14,
+                    borderWidth: 1,
+                    borderColor: '#FEE2E2',
+                  }}
+                >
+                  <Ionicons name="alert-circle" size={22} color="#DC2626" style={{ marginRight: 10 }} />
+                  <Text style={{ flex: 1, fontSize: 13, color: '#991B1B' }}>
+                    {dashboardError}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => fetchDashboardData(false)}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      backgroundColor: '#DC2626',
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Room Card */}
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -249,7 +379,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                     Room {roomNumber}
                   </Text>
                   <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
-                    Primary Residence • Block A
+                    {userName} • Primary Residence
                   </Text>
                 </View>
 
@@ -260,7 +390,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               <HeroGradientCard
                 variant="balance"
                 title="Outstanding Balance"
-                amount="₹1,500"
+                amount={formatCurrency(outstandingBalance)}
                 onActionPress={() => {
                   handleTabPress('payments');
                   handleOpenOnlinePayment();
@@ -322,7 +452,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                       marginBottom: 2,
                     }}
                   >
-                    ₹500
+                    {formatCurrency(currentMaintenance?.amount ?? maintenanceRate)}
                   </Text>
                   <Text
                     style={{
@@ -331,11 +461,36 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                       color: '#64748B',
                     }}
                   >
-                    Due on 5th of every month
+                    {currentMaintenance?.billingMonth
+                      ? `Due for ${formatBillingMonth(currentMaintenance.billingMonth)}`
+                      : 'Due on 5th of every month'}
                   </Text>
                 </View>
 
-                <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
+                {currentMaintenance?.status ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <StatusTag
+                      label={
+                        currentMaintenance.status === 'PAID'
+                          ? 'Paid'
+                          : currentMaintenance.status === 'PARTIALLY_PAID'
+                            ? 'Partial'
+                            : 'Pending'
+                      }
+                      variant={
+                        currentMaintenance.status === 'PAID'
+                          ? 'emerald'
+                          : currentMaintenance.status === 'PARTIALLY_PAID'
+                            ? 'amber'
+                            : 'orange'
+                      }
+                      style={{ marginRight: 8 }}
+                    />
+                    <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
+                  </View>
+                ) : (
+                  <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
+                )}
               </TouchableOpacity>
 
               {/* Recent Payment Card */}
@@ -358,19 +513,46 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   borderColor: '#F1F5F9',
                 }}
               >
-                {/* Soft Mint Circle Icon */}
+                {/* Status-tinted Circle Icon */}
                 <View
                   style={{
                     width: 48,
                     height: 48,
                     borderRadius: 16,
-                    backgroundColor: '#ECFDF5',
+                    backgroundColor:
+                      !recentPayment
+                        ? '#F1F5F9'
+                        : recentPayment.status === 'VERIFIED'
+                          ? '#ECFDF5'
+                          : recentPayment.status === 'PENDING'
+                            ? '#FEF3C7'
+                            : '#FEE2E2',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: 14,
                   }}
                 >
-                  <Ionicons name="checkmark-circle" size={24} color="#059669" />
+                  <Ionicons
+                    name={
+                      !recentPayment
+                        ? 'receipt-outline'
+                        : recentPayment.status === 'VERIFIED'
+                          ? 'checkmark-circle'
+                          : recentPayment.status === 'PENDING'
+                            ? 'time'
+                            : 'alert-circle'
+                    }
+                    size={24}
+                    color={
+                      !recentPayment
+                        ? '#64748B'
+                        : recentPayment.status === 'VERIFIED'
+                          ? '#059669'
+                          : recentPayment.status === 'PENDING'
+                            ? '#D97706'
+                            : '#DC2626'
+                    }
+                  />
                 </View>
 
                 <View style={{ flex: 1 }}>
@@ -382,7 +564,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                       marginBottom: 4,
                     }}
                   >
-                    Recent Payment
+                    Recent Payment{recentPayment?.method ? ` (${recentPayment.method})` : ''}
                   </Text>
                   <Text
                     style={{
@@ -391,13 +573,37 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                       color: '#334155',
                     }}
                   >
-                    September 2026 • ₹500
+                    {recentPayment
+                      ? `${formatPaymentDate(recentPayment.createdAt)} • ${formatCurrency(recentPayment.amount)}`
+                      : 'No recent payments recorded'}
                   </Text>
                 </View>
 
-                {/* Paid Badge + Chevron */}
+                {/* Status Badge + Chevron */}
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <StatusTag label="Paid" variant="emerald" style={{ marginRight: 8 }} />
+                  <StatusTag
+                    label={
+                      !recentPayment
+                        ? 'None'
+                        : recentPayment.status === 'VERIFIED'
+                          ? 'Verified'
+                          : recentPayment.status === 'PENDING'
+                            ? 'Pending'
+                            : recentPayment.status === 'REJECTED'
+                              ? 'Rejected'
+                              : 'Failed'
+                    }
+                    variant={
+                      !recentPayment
+                        ? 'gray'
+                        : recentPayment.status === 'VERIFIED'
+                          ? 'emerald'
+                          : recentPayment.status === 'PENDING'
+                            ? 'amber'
+                            : 'red'
+                    }
+                    style={{ marginRight: 8 }}
+                  />
                   <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
                 </View>
               </TouchableOpacity>
@@ -592,9 +798,22 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                     paddingBottom: 28,
                   }}
                   showsVerticalScrollIndicator={false}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={isRefreshing}
+                      onRefresh={() => fetchDashboardData(true)}
+                      tintColor="#F57C00"
+                      colors={['#F57C00']}
+                    />
+                  }
                 >
                   <PaymentScreen
-                    user={user}
+                    user={{
+                      ...user,
+                      fullName: userName,
+                      roomNumber,
+                    }}
+                    dashboardData={dashboardData}
                     isTab={true}
                     showHeader={false}
                     onNavigateOnlinePayment={handleOpenOnlinePayment}
@@ -604,6 +823,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                     onNavigateProfile={() => handleTabPress('profile')}
                     onOpenNotifications={() => setNotificationsVisible(true)}
                     onLogout={onLogout}
+                    onRefresh={() => fetchDashboardData(true)}
                   />
                 </ScrollView>
               </View>
@@ -611,14 +831,23 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               {/* SUB-VIEW 1: Online Payment Screen (from screenshot) */}
               <View style={{ width: screenWidth, flex: 1 }}>
                 <OnlinePaymentScreen
-                  user={user}
-                  outstandingAmount="₹1,500"
-                  billingMonth="October 2026"
+                  user={{
+                    ...user,
+                    fullName: userName,
+                    roomNumber,
+                  }}
+                  outstandingAmount={formatCurrency(outstandingBalance)}
+                  billingMonth={
+                    currentMaintenance?.billingMonth
+                      ? formatBillingMonth(currentMaintenance.billingMonth)
+                      : 'October 2026'
+                  }
                   upiId="pravin@example@okaxis"
                   recipientName="Residency Maintenance"
                   onBack={handleBackToMainPayments}
                   onSubmitVerification={() => {
                     handleBackToMainPayments();
+                    fetchDashboardData(true);
                   }}
                 />
               </View>
@@ -626,12 +855,17 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               {/* SUB-VIEW 2: Cash Payment Screen (from screenshot) */}
               <View style={{ width: screenWidth, flex: 1 }}>
                 <CashPaymentScreen
-                  user={user}
-                  outstandingAmount="₹1,500"
-                  defaultAmount="1000"
+                  user={{
+                    ...user,
+                    fullName: userName,
+                    roomNumber,
+                  }}
+                  outstandingAmount={formatCurrency(outstandingBalance)}
+                  defaultAmount={String(outstandingBalance > 0 ? outstandingBalance : maintenanceRate)}
                   onBack={handleBackToMainPayments}
                   onSubmitCashPayment={() => {
                     handleBackToMainPayments();
+                    fetchDashboardData(true);
                   }}
                 />
               </View>
@@ -648,6 +882,14 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                 paddingBottom: 28,
               }}
               showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={() => fetchDashboardData(true)}
+                  tintColor="#F57C00"
+                  colors={['#F57C00']}
+                />
+              }
             >
               <View
                 style={{
@@ -664,30 +906,45 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   elevation: 1.5,
                 }}
               >
-                {[
-                  { month: 'October 2026', amount: '₹500', status: 'pending', date: 'Today, 08:30 AM' },
-                  { month: 'September 2026', amount: '₹500', status: 'verified', date: '04 Sep, 2026' },
-                  { month: 'August 2026', amount: '₹500', status: 'verified', date: '05 Aug, 2026' },
-                  { month: 'July 2026', amount: '₹500', status: 'verified', date: '03 Jul, 2026' },
-                  { month: 'June 2026', amount: '₹500', status: 'verified', date: '05 Jun, 2026' },
-                ].map((item, idx) => {
-                  const isVerified = item.status === 'verified';
-                  return (
+                {(() => {
+                  const historyList = [];
+                  if (recentPayment) {
+                    const isVerified = recentPayment.status === 'VERIFIED';
+                    const isPending = recentPayment.status === 'PENDING';
+                    historyList.push({
+                      id: `recent-pay-${recentPayment.paymentId || 'latest'}`,
+                      iconName: isVerified ? 'checkmark-circle' : isPending ? 'time' : 'alert-circle',
+                      iconColor: isVerified ? '#16A34A' : isPending ? '#D97706' : '#DC2626',
+                      iconBgColor: isVerified ? '#DCFCE7' : isPending ? '#FEF3C7' : '#FEE2E2',
+                      title: `Room ${roomNumber} • ${recentPayment.method || 'Payment'}`,
+                      subtitle: `${formatCurrency(recentPayment.amount)} • ${formatPaymentDate(recentPayment.createdAt)}`,
+                      tagLabel: isVerified ? 'Verified' : isPending ? 'Pending' : recentPayment.status,
+                      tagVariant: isVerified ? 'green' : isPending ? 'amber' : 'red',
+                    });
+                  }
+                  const baseHistory = [
+                    { title: `Room ${roomNumber} • September 2026`, subtitle: '₹500 • 04 Sep, 2026', tagLabel: 'Verified', tagVariant: 'green', isVerified: true },
+                    { title: `Room ${roomNumber} • August 2026`, subtitle: '₹500 • 05 Aug, 2026', tagLabel: 'Verified', tagVariant: 'green', isVerified: true },
+                    { title: `Room ${roomNumber} • July 2026`, subtitle: '₹500 • 03 Jul, 2026', tagLabel: 'Verified', tagVariant: 'green', isVerified: true },
+                    { title: `Room ${roomNumber} • June 2026`, subtitle: '₹500 • 05 Jun, 2026', tagLabel: 'Verified', tagVariant: 'green', isVerified: true },
+                  ];
+                  const mergedHistory = [...historyList, ...baseHistory];
+                  return mergedHistory.map((item, idx) => (
                     <ActionRowCard
-                      key={idx}
-                      iconName={isVerified ? 'checkmark-circle' : 'time'}
-                      iconColor={isVerified ? '#16A34A' : '#D97706'}
-                      iconBgColor={isVerified ? '#DCFCE7' : '#FEF3C7'}
-                      title={`Room ${roomNumber} • ${item.month}`}
-                      subtitle={`${item.amount} • ${item.date}`}
-                      tagLabel={isVerified ? 'Verified' : 'Pending'}
-                      tagVariant={isVerified ? 'green' : 'amber'}
+                      key={item.id || idx}
+                      iconName={item.iconName || (item.isVerified ? 'checkmark-circle' : 'time')}
+                      iconColor={item.iconColor || (item.isVerified ? '#16A34A' : '#D97706')}
+                      iconBgColor={item.iconBgColor || (item.isVerified ? '#DCFCE7' : '#FEF3C7')}
+                      title={item.title}
+                      subtitle={item.subtitle}
+                      tagLabel={item.tagLabel}
+                      tagVariant={item.tagVariant}
                       showChevron={true}
                       chevronColor="#94A3B8"
-                      showDivider={idx < 4}
+                      showDivider={idx < mergedHistory.length - 1}
                     />
-                  );
-                })}
+                  ));
+                })()}
               </View>
             </ScrollView>
           </View>
