@@ -20,7 +20,13 @@ import { authService } from '../src/services/authService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateChangePassword, onBack }) {
+export default function LoginScreen({
+  onLogin,
+  onNavigateRegister,
+  onNavigateForgotPassword,
+  onNavigateChangePassword,
+  onBack,
+}) {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -463,7 +469,7 @@ export default function LoginScreen({ onLogin, onNavigateRegister, onNavigateCha
 
               {/* Forgot Password Link */}
               <TouchableOpacity
-                onPress={onNavigateChangePassword}
+                onPress={onNavigateForgotPassword || onNavigateChangePassword}
                 disabled={loading}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >

@@ -25,7 +25,7 @@ import {
 import PaymentScreen from './PaymentScreen';
 import OnlinePaymentScreen from './OnlinePaymentScreen';
 import CashPaymentScreen from './CashPaymentScreen';
-import { getUserDashboard } from '../src/services/api';
+import { getUserDashboard, getMyPayments, getMyMaintenance } from '../src/services/api';
 
 const TAB_ORDER = ['home', 'payments', 'history', 'profile'];
 
@@ -59,6 +59,8 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
 
   // Live dashboard API state
   const [dashboardData, setDashboardData] = useState(null);
+  const [myPayments, setMyPayments] = useState([]);
+  const [myMaintenance, setMyMaintenance] = useState([]);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dashboardError, setDashboardError] = useState(null);
@@ -71,17 +73,31 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
     }
     setDashboardError(null);
     try {
-      const data = await getUserDashboard();
-      console.log(data);
-      if (data) {
-        setDashboardData(data);
+      const [dashRes, paymentsRes, maintRes] = await Promise.allSettled([
+        getUserDashboard(),
+        getMyPayments(),
+        getMyMaintenance(),
+      ]);
+
+      if (dashRes.status === 'fulfilled' && dashRes.value) {
+        setDashboardData(dashRes.value);
+      }
+      if (paymentsRes.status === 'fulfilled' && Array.isArray(paymentsRes.value)) {
+        setMyPayments(paymentsRes.value);
+      }
+      if (maintRes.status === 'fulfilled' && Array.isArray(maintRes.value)) {
+        setMyMaintenance(maintRes.value);
+      }
+
+      if (dashRes.status === 'rejected') {
+        const err = dashRes.reason;
+        console.warn('Failed to load user dashboard:', err?.message || err);
+        setDashboardError(
+          err?.response?.data?.message || err?.message || 'Unable to connect to dashboard server'
+        );
       }
     } catch (err) {
-      console.log(err.message)
-      console.warn('Failed to load user dashboard:', err?.message || err);
-      setDashboardError(
-        err?.response?.data?.message || err?.message || 'Unable to connect to dashboard server'
-      );
+      console.warn('Dashboard fetch exception:', err);
     } finally {
       setIsLoadingDashboard(false);
       setIsRefreshing(false);
@@ -139,7 +155,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   const userName = dashboardData?.residentName || user?.fullName || 'Pravin Kumar';
   const roomNumber = dashboardData?.roomNumber || user?.roomNumber || '101';
   const maintenanceRate = dashboardData?.maintenanceRate != null ? Number(dashboardData.maintenanceRate) : 500;
-  const outstandingBalance = dashboardData?.outstandingBalance != null ? Number(dashboardData.outstandingBalance) : 1000;
+  const outstandingBalance = dashboardData?.outstandingBalance != null ? Number(dashboardData.outstandingBalance) : 0;
   const currentMaintenance = dashboardData?.currentMaintenance || null;
   const recentPayment = dashboardData?.recentPayment || null;
 
@@ -908,7 +924,23 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               >
                 {(() => {
                   const historyList = [];
-                  if (recentPayment) {
+
+                  if (Array.isArray(myPayments) && myPayments.length > 0) {
+                    myPayments.forEach((p) => {
+                      const isVerified = p.status === 'VERIFIED';
+                      const isPending = p.status === 'PENDING';
+                      historyList.push({
+                        id: `pay-${p.id}`,
+                        iconName: isVerified ? 'checkmark-circle' : isPending ? 'time' : 'close-circle',
+                        iconColor: isVerified ? '#16A34A' : isPending ? '#D97706' : '#DC2626',
+                        iconBgColor: isVerified ? '#DCFCE7' : isPending ? '#FEF3C7' : '#FEE2E2',
+                        title: `Room ${roomNumber} • ${p.method || 'Payment'}`,
+                        subtitle: `${formatCurrency(p.amount)} • ${formatPaymentDate(p.createdAt)}`,
+                        tagLabel: isVerified ? 'Verified' : isPending ? 'Pending' : p.status,
+                        tagVariant: isVerified ? 'green' : isPending ? 'amber' : 'red',
+                      });
+                    });
+                  } else if (recentPayment) {
                     const isVerified = recentPayment.status === 'VERIFIED';
                     const isPending = recentPayment.status === 'PENDING';
                     historyList.push({
@@ -922,26 +954,34 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                       tagVariant: isVerified ? 'green' : isPending ? 'amber' : 'red',
                     });
                   }
-                  const baseHistory = [
-                    { title: `Room ${roomNumber} • September 2026`, subtitle: '₹500 • 04 Sep, 2026', tagLabel: 'Verified', tagVariant: 'green', isVerified: true },
-                    { title: `Room ${roomNumber} • August 2026`, subtitle: '₹500 • 05 Aug, 2026', tagLabel: 'Verified', tagVariant: 'green', isVerified: true },
-                    { title: `Room ${roomNumber} • July 2026`, subtitle: '₹500 • 03 Jul, 2026', tagLabel: 'Verified', tagVariant: 'green', isVerified: true },
-                    { title: `Room ${roomNumber} • June 2026`, subtitle: '₹500 • 05 Jun, 2026', tagLabel: 'Verified', tagVariant: 'green', isVerified: true },
-                  ];
-                  const mergedHistory = [...historyList, ...baseHistory];
-                  return mergedHistory.map((item, idx) => (
+
+                  if (historyList.length === 0) {
+                    return (
+                      <View style={{ paddingVertical: 36, alignItems: 'center' }}>
+                        <Ionicons name="receipt-outline" size={38} color="#94A3B8" />
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#334155', marginTop: 10 }}>
+                          No Payment History
+                        </Text>
+                        <Text style={{ fontSize: 12.5, color: '#64748B', marginTop: 4, textAlign: 'center', lineHeight: 18 }}>
+                          Payments submitted for Room {roomNumber} will appear here along with verification receipts.
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  return historyList.map((item, idx) => (
                     <ActionRowCard
                       key={item.id || idx}
-                      iconName={item.iconName || (item.isVerified ? 'checkmark-circle' : 'time')}
-                      iconColor={item.iconColor || (item.isVerified ? '#16A34A' : '#D97706')}
-                      iconBgColor={item.iconBgColor || (item.isVerified ? '#DCFCE7' : '#FEF3C7')}
+                      iconName={item.iconName}
+                      iconColor={item.iconColor}
+                      iconBgColor={item.iconBgColor}
                       title={item.title}
                       subtitle={item.subtitle}
                       tagLabel={item.tagLabel}
                       tagVariant={item.tagVariant}
                       showChevron={true}
                       chevronColor="#94A3B8"
-                      showDivider={idx < mergedHistory.length - 1}
+                      showDivider={idx < historyList.length - 1}
                     />
                   ));
                 })()}

@@ -8,11 +8,13 @@ import {
   Alert,
   Linking,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import Svg, { Rect, Path, G } from 'react-native-svg';
+import { createPayment, uploadImage, updatePaymentProof, api } from '../src/services/api';
 
 /**
  * High-definition QR Code component for UPI scan-to-pay
@@ -131,7 +133,10 @@ export default function OnlinePaymentScreen({
   const roomNumber = user?.roomNumber || '101';
 
   const [utrNumber, setUtrNumber] = useState('');
-  const [screenshotUri, setScreenshotUri] = useState(null);
+  const [localImageUri, setLocalImageUri] = useState(null);
+  const [uploadedUrl, setUploadedUrl] = useState(null);
+  const [uploadedPublicId, setUploadedPublicId] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCopy = (text, label) => {
@@ -152,32 +157,78 @@ export default function OnlinePaymentScreen({
     });
   };
 
+  // Requirement 1 & 2: Selecting an image only shows local preview; no auto-upload; allowsEditing: false
   const handlePickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
           'Permission Needed',
-          'Please allow media access to upload your payment screenshot.'
+          'Please allow media access to select your payment screenshot.'
         );
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsEditing: false, // Requirement 2: remove image editing controls
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setScreenshotUri(result.assets[0].uri);
+        setLocalImageUri(result.assets[0].uri);
+        // Reset uploaded state when a new local image is chosen
+        setUploadedUrl(null);
+        setUploadedPublicId(null);
       }
     } catch {
-      Alert.alert('Upload Error', 'Could not access image library.');
+      Alert.alert('Selection Error', 'Could not access image library.');
     }
   };
 
-  const handleSubmit = () => {
+  const handleRemoveImage = () => {
+    setLocalImageUri(null);
+    setUploadedUrl(null);
+    setUploadedPublicId(null);
+  };
+
+  // Requirement 3, 4 & 5: Upload Image button sends multipart/form-data to POST /api/uploads/image
+  const handleUploadImage = async () => {
+    if (isUploading || isSubmitting) return;
+
+    if (!localImageUri) {
+      Alert.alert('No Image Selected', 'Please select an image first.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const uploadRes = await uploadImage(localImageUri, 'payment_proofs');
+      if (uploadRes?.url) {
+        setUploadedUrl(uploadRes.url);
+        setUploadedPublicId(uploadRes.publicId || null);
+        Alert.alert(
+          'Upload Successful',
+          'Screenshot uploaded to Cloudinary. You can now submit your payment verification.'
+        );
+      } else {
+        throw new Error('Server did not return a valid image URL.');
+      }
+    } catch (err) {
+      console.warn('Screenshot upload failed:', err);
+      Alert.alert(
+        'Upload Failed',
+        err?.response?.data?.message || err?.message || 'Unable to upload image. Please try again.'
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Requirement 6, 7, 8 & 9: Submit for verification
+  const handleSubmit = async () => {
+    if (isSubmitting || isUploading) return;
+
     const trimmed = utrNumber.trim();
     if (!trimmed) {
       Alert.alert(
@@ -187,33 +238,86 @@ export default function OnlinePaymentScreen({
       return;
     }
 
+    if (localImageUri && !uploadedUrl) {
+      Alert.alert(
+        'Upload Required',
+        'Please tap "Upload Image" to upload your selected screenshot before submitting.'
+      );
+      return;
+    }
+
+    const rawNum = parseInt(outstandingAmount.replace(/[^0-9]/g, '') || '500', 10);
+    const amountToPay = rawNum > 0 ? rawNum : 500;
+
     setIsSubmitting(true);
 
-    const paymentData = {
-      id: `rec-${Date.now()}`,
-      room: roomNumber,
-      month: billingMonth,
-      amount: outstandingAmount,
-      status: 'pending',
-      method: 'Online UPI',
-      refId: trimmed,
-      screenshotUri: screenshotUri,
-      date: 'Just now',
-      verifiedBy: 'Pending Admin Verification',
-    };
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      if (onSubmitVerification) {
-        onSubmitVerification(paymentData);
+    try {
+      // 1. Create or retrieve active pending payment for room
+      let paymentRes;
+      try {
+        paymentRes = await createPayment({
+          amount: amountToPay,
+          method: 'ONLINE',
+        });
+      } catch (err) {
+        if (err?.response?.data?.message?.includes('already has a pending payment')) {
+          const myPending = await api.get('/payments/my');
+          const existingPending = Array.isArray(myPending.data)
+            ? myPending.data.find((p) => p.status === 'PENDING')
+            : null;
+          if (existingPending) {
+            paymentRes = existingPending;
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
       }
+
+      // 2. Submit payment proof with UTR and uploaded Cloudinary URL
+      if (paymentRes?.id) {
+        await updatePaymentProof(paymentRes.id, {
+          transactionReference: trimmed,
+          screenshotUrl: uploadedUrl,
+          screenshotPublicId: uploadedPublicId,
+        });
+      }
+
+      if (onSubmitVerification) {
+        onSubmitVerification({
+          id: paymentRes?.id,
+          room: roomNumber,
+          month: billingMonth,
+          amount: `₹${amountToPay.toLocaleString('en-IN')}`,
+          status: 'pending',
+          method: 'Online UPI',
+          refId: trimmed,
+          screenshotUri: uploadedUrl || localImageUri,
+          date: 'Just now',
+          verifiedBy: 'Pending Admin Verification',
+        });
+      }
+
       Alert.alert(
         'Submitted for Verification',
-        'Your payment reference has been submitted. The society administrator will verify your payment and update your receipt status.',
+        'Your payment reference and proof have been submitted. The society administrator will verify your payment and update your receipt status.',
         [{ text: 'OK', onPress: onBack }]
       );
-    }, 400);
+    } catch (err) {
+      console.warn('Online payment submission failed:', err);
+      // Retain uploadedUrl in state so user can retry submit without re-uploading to Cloudinary
+      Alert.alert(
+        'Submission Failed',
+        err?.response?.data?.message || err?.message || 'Unable to submit payment proof. You can retry submitting.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const hasLocalImagePendingUpload = Boolean(localImageUri) && !uploadedUrl;
+  const isSubmitDisabled = isSubmitting || isUploading || !utrNumber.trim() || hasLocalImagePendingUpload;
 
   return (
     <ScrollView
@@ -840,7 +944,7 @@ export default function OnlinePaymentScreen({
         </View>
 
         {/* Upload screenshot container */}
-        {!screenshotUri ? (
+        {!localImageUri ? (
           /* Empty State: Spacious stacked rows */
           <TouchableOpacity
             onPress={handlePickImage}
@@ -893,7 +997,7 @@ export default function OnlinePaymentScreen({
                 marginBottom: 14,
               }}
             >
-              JPG or PNG • Max 5 MB
+              JPG, PNG, WEBP • Max 10 MB
             </Text>
 
             {/* Row 3: Choose Image button */}
@@ -936,10 +1040,10 @@ export default function OnlinePaymentScreen({
           <View
             style={{
               borderWidth: 1.5,
-              borderColor: '#FED7AA',
+              borderColor: uploadedUrl ? '#BBF7D0' : '#FED7AA',
               borderRadius: 16,
               padding: 14,
-              backgroundColor: '#FFFBF7',
+              backgroundColor: uploadedUrl ? '#F0FDF4' : '#FFFBF7',
               marginBottom: 16,
             }}
           >
@@ -951,18 +1055,43 @@ export default function OnlinePaymentScreen({
                 backgroundColor: '#E2E8F0',
                 marginBottom: 12,
                 borderWidth: 1,
-                borderColor: '#E2E8F0',
+                borderColor: uploadedUrl ? '#86EFAC' : '#E2E8F0',
+                position: 'relative',
               }}
             >
               <Image
-                source={{ uri: screenshotUri }}
+                source={{ uri: uploadedUrl || localImageUri }}
                 style={{
                   width: '100%',
-                  height: 150,
+                  height: 160,
                   borderRadius: 12,
                 }}
                 resizeMode="cover"
               />
+              {/* Badge Overlay */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  backgroundColor: uploadedUrl ? 'rgba(22, 163, 74, 0.9)' : 'rgba(234, 88, 12, 0.9)',
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <Ionicons
+                  name={uploadedUrl ? 'cloud-done' : 'eye-outline'}
+                  size={12}
+                  color="#FFFFFF"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>
+                  {uploadedUrl ? 'Uploaded to Cloud' : 'Local Preview (Not Uploaded)'}
+                </Text>
+              </View>
             </View>
 
             {/* Row 2: Status with Checkmark */}
@@ -977,9 +1106,9 @@ export default function OnlinePaymentScreen({
             >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Ionicons
-                  name="checkmark-circle"
+                  name={uploadedUrl ? 'checkmark-circle' : 'alert-circle-outline'}
                   size={18}
-                  color="#16A34A"
+                  color={uploadedUrl ? '#16A34A' : '#D97706'}
                   style={{ marginRight: 6 }}
                 />
                 <Text
@@ -989,15 +1118,64 @@ export default function OnlinePaymentScreen({
                     color: '#0F172A',
                   }}
                 >
-                  Screenshot Attached
+                  {uploadedUrl ? 'Screenshot Uploaded' : 'Image Selected'}
                 </Text>
               </View>
-              <Text style={{ fontSize: 11, color: '#64748B' }}>
-                Ready to verify
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: '600',
+                  color: uploadedUrl ? '#16A34A' : '#D97706',
+                }}
+              >
+                {uploadedUrl ? 'Ready to Submit' : 'Upload Required'}
               </Text>
             </View>
 
-            {/* Row 3: Action Buttons (Change Image & Remove) */}
+            {/* Row 3: Action Buttons */}
+            {!uploadedUrl && (
+              <TouchableOpacity
+                onPress={handleUploadImage}
+                disabled={isUploading || isSubmitting}
+                activeOpacity={0.8}
+                style={{
+                  backgroundColor: isUploading ? '#94A3B8' : '#0284C7',
+                  borderRadius: 12,
+                  paddingVertical: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 10,
+                  shadowColor: '#0284C7',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isUploading ? 0 : 0.2,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }}
+              >
+                {isUploading ? (
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                      Uploading to Cloudinary...
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons
+                      name="cloud-upload"
+                      size={16}
+                      color="#FFFFFF"
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                      Upload Image to Cloud
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+
             <View
               style={{
                 flexDirection: 'row',
@@ -1005,14 +1183,15 @@ export default function OnlinePaymentScreen({
                 gap: 10,
               }}
             >
-              {/* Change Image Button */}
+              {/* Choose Another Image Button */}
               <TouchableOpacity
                 onPress={handlePickImage}
+                disabled={isUploading || isSubmitting}
                 activeOpacity={0.8}
                 style={{
                   flex: 1,
                   borderWidth: 1.5,
-                  borderColor: '#EA580C',
+                  borderColor: '#CBD5E1',
                   backgroundColor: '#FFFFFF',
                   borderRadius: 12,
                   paddingVertical: 9,
@@ -1022,25 +1201,26 @@ export default function OnlinePaymentScreen({
                 }}
               >
                 <Ionicons
-                  name="cloud-upload-outline"
+                  name="image-outline"
                   size={15}
-                  color="#EA580C"
+                  color="#475569"
                   style={{ marginRight: 6 }}
                 />
                 <Text
                   style={{
                     fontSize: 12.5,
                     fontWeight: '700',
-                    color: '#EA580C',
+                    color: '#475569',
                   }}
                 >
-                  Change Image
+                  Choose Another
                 </Text>
               </TouchableOpacity>
 
               {/* Remove Button */}
               <TouchableOpacity
-                onPress={() => setScreenshotUri(null)}
+                onPress={handleRemoveImage}
+                disabled={isUploading || isSubmitting}
                 activeOpacity={0.8}
                 style={{
                   borderWidth: 1,
@@ -1074,37 +1254,79 @@ export default function OnlinePaymentScreen({
           </View>
         )}
 
+        {/* Warning if local preview exists but not uploaded */}
+        {hasLocalImagePendingUpload && (
+          <View
+            style={{
+              backgroundColor: '#FFFBEB',
+              borderColor: '#FDE68A',
+              borderWidth: 1,
+              borderRadius: 10,
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              marginBottom: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Ionicons
+              name="information-circle"
+              size={16}
+              color="#D97706"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={{ fontSize: 11.5, color: '#92400E', flex: 1, fontWeight: '500' }}>
+              Please tap &quot;Upload Image to Cloud&quot; above before submitting your verification.
+            </Text>
+          </View>
+        )}
+
         {/* Submit for Verification Button */}
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitDisabled}
           activeOpacity={0.85}
           style={{
-            backgroundColor: '#F57C00',
+            backgroundColor: isSubmitDisabled ? '#CBD5E1' : '#F57C00',
             borderRadius: 14,
             paddingVertical: 14,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            shadowColor: '#F57C00',
+            shadowColor: isSubmitDisabled ? 'transparent' : '#F57C00',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.28,
+            shadowOpacity: isSubmitDisabled ? 0 : 0.28,
             shadowRadius: 8,
-            elevation: 3,
+            elevation: isSubmitDisabled ? 0 : 3,
           }}
         >
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 15,
-              fontWeight: '700',
-              marginRight: 6,
-            }}
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit for Verification'}
-          </Text>
-          {!isSubmitting && (
-            <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
+          {isSubmitting ? (
+            <>
+              <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 15,
+                  fontWeight: '700',
+                }}
+              >
+                Submitting for Verification...
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 15,
+                  fontWeight: '700',
+                  marginRight: 6,
+                }}
+              >
+                Submit for Verification
+              </Text>
+              <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
+            </>
           )}
         </TouchableOpacity>
       </View>

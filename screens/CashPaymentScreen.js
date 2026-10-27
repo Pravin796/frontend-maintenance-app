@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Rect, Circle, Path, G } from 'react-native-svg';
+import { createCashPaymentRequest } from '../src/services/api';
 
 /**
  * CashIllustrationSvg
@@ -77,38 +78,53 @@ export default function CashPaymentScreen({
   const [amount, setAmount] = useState(defaultAmount);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const trimmed = amount.trim();
     if (!trimmed || isNaN(trimmed) || Number(trimmed) <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid cash payment amount.');
       return;
     }
 
+    const numAmount = Number(trimmed);
     setIsSubmitting(true);
 
-    const paymentData = {
-      id: `cash-${Date.now()}`,
-      room: roomNumber,
-      amount: `₹${Number(trimmed).toLocaleString('en-IN')}`,
-      status: 'pending',
-      method: 'Cash Payment',
-      date: 'Just now',
-      verifiedBy: 'Pending Admin Verification',
-    };
+    try {
+      const res = await createCashPaymentRequest({
+        amount: numAmount,
+        roomId: user?.roomId,
+      });
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+      const paymentData = {
+        id: res?.id ? `cash-${res.id}` : `cash-${Date.now()}`,
+        backendId: res?.id,
+        room: roomNumber,
+        amount: `₹${numAmount.toLocaleString('en-IN')}`,
+        status: 'pending',
+        method: 'Cash Payment',
+        date: 'Just now',
+        verifiedBy: 'Pending Admin Verification',
+      };
+
       if (onSubmitCashPayment) {
         onSubmitCashPayment(paymentData);
       }
+
       Alert.alert(
         'Cash Payment Declared',
-        `Your declaration of ₹${Number(trimmed).toLocaleString(
+        `Your declaration of ₹${numAmount.toLocaleString(
           'en-IN'
         )} has been submitted. The admin will verify it once received.`,
         [{ text: 'OK', onPress: onBack }]
       );
-    }, 450);
+    } catch (err) {
+      console.warn('Cash payment declaration failed:', err);
+      Alert.alert(
+        'Declaration Failed',
+        err?.response?.data?.message || err?.message || 'Unable to submit cash payment declaration.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

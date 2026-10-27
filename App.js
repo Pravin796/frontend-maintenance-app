@@ -13,9 +13,10 @@ import DashboardScreen from './screens/DashboardScreen';
 import AdminDashboardScreen from './screens/AdminDashboardScreen';
 import PaymentScreen from './screens/PaymentScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import { Asset } from 'expo-asset';
 import { authService } from './src/services/authService';
-import { setUnauthorizedHandler } from './src/services/api';
+import { setUnauthorizedHandler, setPasswordChangeRequiredHandler } from './src/services/api';
 
 const Stack = createNativeStackNavigator();
 
@@ -42,6 +43,14 @@ export default function App() {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       handleLogout();
+    });
+    setPasswordChangeRequiredHandler(() => {
+      if (navigationRef.current) {
+        navigationRef.current.reset({
+          index: 0,
+          routes: [{ name: 'ChangePassword' }],
+        });
+      }
     });
   }, [handleLogout]);
 
@@ -146,7 +155,18 @@ export default function App() {
                   }
                 }}
                 onNavigateRegister={() => props.navigation.navigate('Register')}
+                onNavigateForgotPassword={() => props.navigation.navigate('ForgotPassword')}
                 onNavigateChangePassword={() => props.navigation.navigate('ChangePassword')}
+                onBack={() => props.navigation.goBack()}
+              />
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="ForgotPassword">
+            {(props) => (
+              <ForgotPasswordScreen
+                {...props}
+                onNavigateLogin={() => props.navigation.navigate('Login')}
                 onBack={() => props.navigation.goBack()}
               />
             )}

@@ -12,9 +12,14 @@ export const api = axios.create({
 });
 
 let onUnauthorizedCallback = null;
+let onPasswordChangeRequiredCallback = null;
 
 export const setUnauthorizedHandler = (callback) => {
   onUnauthorizedCallback = callback;
+};
+
+export const setPasswordChangeRequiredHandler = (callback) => {
+  onPasswordChangeRequiredCallback = callback;
 };
 
 api.interceptors.request.use(
@@ -72,6 +77,14 @@ api.interceptors.response.use(
       if (typeof onUnauthorizedCallback === 'function') {
         onUnauthorizedCallback(error);
       }
+    } else if (
+      status === 403 &&
+      typeof error.response?.data?.message === 'string' &&
+      error.response.data.message.toLowerCase().includes('password change required')
+    ) {
+      if (typeof onPasswordChangeRequiredCallback === 'function') {
+        onPasswordChangeRequiredCallback(error);
+      }
     }
 
     return Promise.reject(error);
@@ -79,15 +92,84 @@ api.interceptors.response.use(
 );
 
 /**
- * User & Resident Dashboard API
+ * User & Resident Dashboard and Payment API
  */
 export const getUserDashboard = async () => {
   const response = await api.get('/users/me/dashboard');
   return response.data;
 };
 
+export const getMyPayments = async () => {
+  const response = await api.get('/payments/my');
+  return response.data;
+};
+
+export const getMyMaintenance = async () => {
+  const response = await api.get('/maintenance/my');
+  return response.data;
+};
+
+export const createPayment = async ({ amount, method = 'ONLINE' }) => {
+  const response = await api.post('/payments', { amount, method });
+  return response.data;
+};
+
+export const uploadImage = async (uri, folder = 'payment_proofs') => {
+  const formData = new FormData();
+  const rawFilename = uri.split('/').pop() || 'proof.jpg';
+  const filename = rawFilename.includes('.') ? rawFilename : `${rawFilename}.jpg`;
+  const match = /\.(\w+)$/.exec(filename);
+  const ext = match ? match[1].toLowerCase() : 'jpg';
+  let type = 'image/jpeg';
+  if (ext === 'png') type = 'image/png';
+  else if (ext === 'webp') type = 'image/webp';
+  else if (ext === 'gif') type = 'image/gif';
+
+  formData.append('file', {
+    uri,
+    name: filename,
+    type,
+  });
+
+  if (folder) {
+    formData.append('folder', folder);
+  }
+
+  const response = await api.post('/uploads/image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    transformRequest: (data) => data,
+  });
+  return response.data;
+};
+
+export const updatePaymentProof = async (paymentId, { transactionReference, screenshotUrl, screenshotPublicId }) => {
+  const response = await api.patch(`/payments/${paymentId}/proof`, {
+    transactionReference,
+    screenshotUrl,
+    screenshotPublicId,
+  });
+  return response.data;
+};
+
+export const createCashPaymentRequest = async ({ amount, roomId }) => {
+  const payload = { amount };
+  if (roomId != null) {
+    payload.roomId = roomId;
+  }
+  const response = await api.post('/cash-payments', payload);
+  return response.data;
+};
+
 export const userApi = {
   getUserDashboard,
+  getMyPayments,
+  getMyMaintenance,
+  createPayment,
+  uploadImage,
+  updatePaymentProof,
+  createCashPaymentRequest,
 };
 
 /**

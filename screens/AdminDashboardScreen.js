@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   HeroGradientCard,
@@ -122,6 +123,7 @@ export default function AdminDashboardScreen({
   // Password reset modal state
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetResult, setResetResult] = useState(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Add room modal state
   const [createRoomModalVisible, setCreateRoomModalVisible] = useState(false);
@@ -606,15 +608,43 @@ export default function AdminDashboardScreen({
     return p.status === 'pending';
   });
 
+  const handleCopyPassword = async () => {
+    if (!resetResult?.temporaryPassword) return;
+    try {
+      await Clipboard.setStringAsync(resetResult.temporaryPassword);
+      setIsCopied(true);
+      setTimeout(() => {
+        setIsCopied(false);
+      }, 2500);
+    } catch (err) {
+      console.warn('Failed to copy password:', err);
+    }
+  };
+
   const handleResetPassword = (resident) => {
     if (!resident || !resident.id) {
       Alert.alert('Error', 'Resident account information not available.');
       return;
     }
 
+    if (resident.passwordResetAt) {
+      const resetTime = new Date(resident.passwordResetAt).getTime();
+      if (!isNaN(resetTime)) {
+        const elapsedMinutes = Math.floor((Date.now() - resetTime) / (1000 * 60));
+        if (elapsedMinutes >= 0 && elapsedMinutes < 60) {
+          const remainingMinutes = 60 - elapsedMinutes;
+          Alert.alert(
+            'Regeneration Locked',
+            `A temporary password was recently generated for ${resident.name}. To prevent token inconsistency and ensure reliable verification, password regeneration is locked for 1 hour.\n\nPlease wait ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}.`
+          );
+          return;
+        }
+      }
+    }
+
     Alert.alert(
       'Reset Password',
-      `Are you sure you want to reset the password for ${resident.name} (Room ${resident.roomNumber})?\n\nA secure temporary password will be generated, and the resident must set a new password upon their next login.`,
+      `Are you sure you want to reset the password for ${resident.name} (Room ${resident.roomNumber})?\n\nA secure temporary password will be generated. Once generated, password regeneration for this user will be locked for 1 hour to prevent credential conflicts.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -624,11 +654,19 @@ export default function AdminDashboardScreen({
             setIsResettingPassword(true);
             try {
               const res = await resetResidentPassword(resident.id);
+              const resetTimestamp = res.passwordResetAt || new Date().toISOString();
+              setResidents((prev) =>
+                prev.map((r) =>
+                  r.id === resident.id ? { ...r, passwordResetAt: resetTimestamp } : r
+                )
+              );
               setSelectedRoomDetail(null);
+              setIsCopied(false);
               setResetResult({
                 roomNumber: res.roomNumber || resident.roomNumber,
                 userName: resident.name,
                 temporaryPassword: res.temporaryPassword,
+                passwordResetAt: resetTimestamp,
               });
             } catch (err) {
               console.warn('Password reset failed:', err?.message || err);
@@ -3059,35 +3097,80 @@ export default function AdminDashboardScreen({
                       </View>
                     </View>
 
-                    {/* Reset Password Button */}
-                    <TouchableOpacity
-                      onPress={() => handleResetPassword(selectedRoomDetail.residentData)}
-                      disabled={isResettingPassword}
-                      activeOpacity={0.8}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#FFF1F2',
-                        paddingVertical: 12,
-                        borderRadius: 12,
-                        borderWidth: 1,
-                        borderColor: '#FECDD3',
-                        gap: 8,
-                        opacity: isResettingPassword ? 0.6 : 1,
-                      }}
-                    >
-                      {isResettingPassword ? (
-                        <ActivityIndicator size="small" color="#E11D48" />
-                      ) : (
-                        <>
-                          <Ionicons name="key-outline" size={17} color="#E11D48" />
-                          <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#E11D48' }}>
-                            Reset Resident Password
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
+                    {/* Reset Password Button with 1-Hour Cooldown Protection */}
+                    {(() => {
+                      const resData = selectedRoomDetail.residentData;
+                      const resetTime = resData?.passwordResetAt ? new Date(resData.passwordResetAt).getTime() : null;
+                      const elapsedMinutes = resetTime && !isNaN(resetTime) ? Math.floor((Date.now() - resetTime) / (1000 * 60)) : 999;
+                      const isCooldownActive = elapsedMinutes >= 0 && elapsedMinutes < 60;
+                      const remainingMinutes = 60 - elapsedMinutes;
+
+                      return (
+                        <View style={{ marginTop: 2 }}>
+                          <TouchableOpacity
+                            onPress={() => handleResetPassword(resData)}
+                            disabled={isResettingPassword || isCooldownActive}
+                            activeOpacity={0.8}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: isCooldownActive ? '#F1F5F9' : '#FFF1F2',
+                              paddingVertical: 12,
+                              borderRadius: 12,
+                              borderWidth: 1,
+                              borderColor: isCooldownActive ? '#E2E8F0' : '#FECDD3',
+                              gap: 8,
+                              opacity: isResettingPassword ? 0.6 : 1,
+                            }}
+                          >
+                            {isResettingPassword ? (
+                              <ActivityIndicator size="small" color="#E11D48" />
+                            ) : (
+                              <>
+                                <Ionicons
+                                  name={isCooldownActive ? 'time-outline' : 'key-outline'}
+                                  size={17}
+                                  color={isCooldownActive ? '#64748B' : '#E11D48'}
+                                />
+                                <Text
+                                  style={{
+                                    fontSize: 13.5,
+                                    fontWeight: '700',
+                                    color: isCooldownActive ? '#64748B' : '#E11D48',
+                                  }}
+                                >
+                                  {isCooldownActive
+                                    ? `Regenerate Locked (${remainingMinutes}m remaining)`
+                                    : 'Reset Resident Password'}
+                                </Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+
+                          {isCooldownActive && (
+                            <View
+                              style={{
+                                backgroundColor: '#FFFBEB',
+                                borderRadius: 10,
+                                padding: 10,
+                                marginTop: 8,
+                                borderWidth: 1,
+                                borderColor: '#FEF3C7',
+                                flexDirection: 'row',
+                                alignItems: 'flex-start',
+                                gap: 6,
+                              }}
+                            >
+                              <Ionicons name="information-circle-outline" size={16} color="#D97706" style={{ marginTop: 1 }} />
+                              <Text style={{ flex: 1, fontSize: 11.5, color: '#92400E', lineHeight: 16 }}>
+                                A temporary password was generated recently. Regeneration is locked for 1 hour to prevent token inconsistency.
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })()}
                   </View>
                 ) : (
                   <View
@@ -3225,7 +3308,10 @@ export default function AdminDashboardScreen({
         visible={resetResult !== null}
         animationType="fade"
         transparent
-        onRequestClose={() => setResetResult(null)}
+        onRequestClose={() => {
+          setIsCopied(false);
+          setResetResult(null);
+        }}
       >
         <View
           style={{
@@ -3274,14 +3360,15 @@ export default function AdminDashboardScreen({
               Generated for {resetResult?.userName} (Room {resetResult?.roomNumber})
             </Text>
 
+            {/* Code Box with In-line Copy Button */}
             <View
               style={{
                 backgroundColor: '#F8FAFC',
                 borderRadius: 16,
                 borderWidth: 1.5,
-                borderColor: '#FED7AA',
+                borderColor: isCopied ? '#86EFAC' : '#FED7AA',
                 paddingVertical: 14,
-                paddingHorizontal: 20,
+                paddingHorizontal: 16,
                 alignItems: 'center',
                 width: '100%',
                 marginBottom: 14,
@@ -3299,21 +3386,49 @@ export default function AdminDashboardScreen({
               >
                 Temporary Password
               </Text>
-              <TextInput
-                value={resetResult?.temporaryPassword || ''}
-                editable={false}
-                selectTextOnFocus
+              <View
                 style={{
-                  fontSize: 22,
-                  fontWeight: '800',
-                  color: '#EA580C',
-                  fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-                  letterSpacing: 2,
-                  textAlign: 'center',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  width: '100%',
                 }}
-              />
+              >
+                <TextInput
+                  value={resetResult?.temporaryPassword || ''}
+                  editable={false}
+                  selectTextOnFocus
+                  style={{
+                    fontSize: 22,
+                    fontWeight: '800',
+                    color: '#EA580C',
+                    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+                    letterSpacing: 2,
+                    textAlign: 'center',
+                  }}
+                />
+                <TouchableOpacity
+                  onPress={handleCopyPassword}
+                  activeOpacity={0.7}
+                  style={{
+                    backgroundColor: isCopied ? '#DCFCE7' : '#FFF7ED',
+                    padding: 8,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: isCopied ? '#86EFAC' : '#FDBA74',
+                  }}
+                >
+                  <Ionicons
+                    name={isCopied ? 'checkmark' : 'copy-outline'}
+                    size={18}
+                    color={isCopied ? '#16A34A' : '#EA580C'}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
+            {/* Security & Cooldown Info */}
             <View
               style={{
                 backgroundColor: '#FFFBEB',
@@ -3321,7 +3436,7 @@ export default function AdminDashboardScreen({
                 padding: 12,
                 borderWidth: 1,
                 borderColor: '#FEF3C7',
-                marginBottom: 20,
+                marginBottom: 18,
                 flexDirection: 'row',
                 alignItems: 'flex-start',
                 gap: 8,
@@ -3329,21 +3444,51 @@ export default function AdminDashboardScreen({
             >
               <Ionicons name="information-circle" size={17} color="#D97706" style={{ marginTop: 1 }} />
               <Text style={{ flex: 1, fontSize: 11.5, color: '#92400E', lineHeight: 16 }}>
-                Share this password with the resident securely. They must choose a new password upon login. For safety, this temporary password will not be shown again.
+                Share this password securely with the resident. For account consistency, password regeneration for this user is locked for 1 hour.
               </Text>
             </View>
 
+            {/* Copy Button */}
             <TouchableOpacity
-              onPress={() => setResetResult(null)}
+              onPress={handleCopyPassword}
+              activeOpacity={0.8}
               style={{
-                backgroundColor: '#F57C00',
+                backgroundColor: isCopied ? '#16A34A' : '#F57C00',
+                borderRadius: 14,
+                paddingVertical: 13,
+                width: '100%',
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <Ionicons
+                name={isCopied ? 'checkmark-circle' : 'copy-outline'}
+                size={18}
+                color="#FFFFFF"
+              />
+              <Text style={{ color: '#FFFFFF', fontSize: 14.5, fontWeight: '700' }}>
+                {isCopied ? 'Copied to Clipboard!' : 'Copy Password'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Done Button */}
+            <TouchableOpacity
+              onPress={() => {
+                setIsCopied(false);
+                setResetResult(null);
+              }}
+              style={{
+                backgroundColor: '#F1F5F9',
                 borderRadius: 14,
                 paddingVertical: 13,
                 width: '100%',
                 alignItems: 'center',
               }}
             >
-              <Text style={{ color: '#FFFFFF', fontSize: 14.5, fontWeight: '700' }}>Done</Text>
+              <Text style={{ color: '#475569', fontSize: 14.5, fontWeight: '700' }}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>
