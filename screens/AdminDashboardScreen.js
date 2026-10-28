@@ -37,6 +37,7 @@ import {
   rejectOnlinePayment,
   createPaymentAllocation,
   getMaintenanceByRoom,
+  createMaintenance,
   getAllRooms,
   createRoom,
   updateRoomExemption,
@@ -107,6 +108,7 @@ export default function AdminDashboardScreen({
   const [roomMaintenanceRecords, setRoomMaintenanceRecords] = useState([]);
   const [isLoadingRoomMaintenance, setIsLoadingRoomMaintenance] = useState(false);
   const [selectedMaintenanceId, setSelectedMaintenanceId] = useState(null);
+  const [isGeneratingMaintenance, setIsGeneratingMaintenance] = useState(false);
 
   // Live rooms and residents administration state (Phase 7)
   const [liveRooms, setLiveRooms] = useState([]);
@@ -426,11 +428,14 @@ export default function AdminDashboardScreen({
         const records = await getMaintenanceByRoom(item.roomId);
         if (Array.isArray(records)) {
           setRoomMaintenanceRecords(records);
-          const pendingRecord = records.find((r) => Number(r.remainingBalance) > 0);
+          const pendingRecord = records.find((r) => {
+            const due = Number(r.remainingBalance ?? r.remainingAmount ?? (r.status === 'PAID' ? 0 : (r.totalAmount ?? r.amount ?? 0)));
+            return due > 0 && r.status !== 'PAID';
+          });
           if (pendingRecord) {
             setSelectedMaintenanceId(pendingRecord.id);
-          } else if (records.length > 0) {
-            setSelectedMaintenanceId(records[0].id);
+          } else {
+            setSelectedMaintenanceId(null);
           }
         }
       } catch (err) {
@@ -438,6 +443,59 @@ export default function AdminDashboardScreen({
       } finally {
         setIsLoadingRoomMaintenance(false);
       }
+    }
+  };
+
+  const handleGenerateNextMonthBill = async () => {
+    if (!verifyModalItem?.roomId) return;
+    setIsGeneratingMaintenance(true);
+    try {
+      const now = new Date();
+      let targetYear = now.getFullYear();
+      let targetMonth = now.getMonth() + 1;
+
+      if (roomMaintenanceRecords.length > 0) {
+        const sorted = [...roomMaintenanceRecords].sort((a, b) => {
+          return String(b.billingMonth || '').localeCompare(String(a.billingMonth || ''));
+        });
+        const latestStr = String(sorted[0]?.billingMonth || '');
+        if (latestStr.length >= 7) {
+          const parts = latestStr.split('-');
+          let yr = parseInt(parts[0], 10);
+          let mo = parseInt(parts[1], 10);
+          mo += 1;
+          if (mo > 12) {
+            mo = 1;
+            yr += 1;
+          }
+          const curMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          if (latestStr >= curMonthStr) {
+            targetYear = yr;
+            targetMonth = mo;
+          }
+        }
+      }
+
+      const billingMonthStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+      await createMaintenance({
+        roomId: verifyModalItem.roomId,
+        billingMonth: billingMonthStr,
+      });
+
+      const updatedRecords = await getMaintenanceByRoom(verifyModalItem.roomId);
+      if (Array.isArray(updatedRecords)) {
+        setRoomMaintenanceRecords(updatedRecords);
+        const newRecord = updatedRecords.find((r) => String(r.billingMonth) === billingMonthStr);
+        if (newRecord) {
+          setSelectedMaintenanceId(newRecord.id);
+        }
+      }
+      Alert.alert('Bill Generated', `Successfully created maintenance bill for ${billingMonthStr}.`);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Could not generate maintenance record.';
+      Alert.alert('Generation Error', msg);
+    } finally {
+      setIsGeneratingMaintenance(false);
     }
   };
 
@@ -456,7 +514,7 @@ export default function AdminDashboardScreen({
       if (!selectedMaintenanceId) {
         Alert.alert(
           'Maintenance Record Required',
-          'Cash verification requires allocating the payment to an active maintenance record for this room. Please select a maintenance record below.'
+          'Cash verification requires allocating the payment to an active unpaid maintenance record for this room. Please select an unpaid maintenance record or generate a new bill below.'
         );
         return;
       }
@@ -466,6 +524,28 @@ export default function AdminDashboardScreen({
           `Under society rules, the verified cash allocation must match the declared request amount (₹${verifyModalItem.rawAmount.toLocaleString('en-IN')}).`
         );
         return;
+      }
+      const selectedRec = roomMaintenanceRecords.find((r) => r.id === selectedMaintenanceId);
+      if (selectedRec) {
+        const remaining = Number(
+          selectedRec.remainingBalance ??
+          selectedRec.remainingAmount ??
+          (selectedRec.status === 'PAID' ? 0 : (selectedRec.totalAmount ?? selectedRec.amount ?? 0))
+        );
+        if (remaining <= 0 || selectedRec.status === 'PAID') {
+          Alert.alert(
+            'Bill Already Cleared',
+            'The selected maintenance record is already fully cleared. Please choose an unpaid maintenance record or generate a new bill.'
+          );
+          return;
+        }
+        if (approvedNum > remaining) {
+          Alert.alert(
+            'Allocation Exceeds Due Balance',
+            `The allocation amount (₹${approvedNum.toLocaleString('en-IN')}) exceeds the remaining unpaid balance for this bill (₹${remaining.toLocaleString('en-IN')}).`
+          );
+          return;
+        }
       }
     }
 
@@ -2448,35 +2528,58 @@ export default function AdminDashboardScreen({
                   <View style={{ gap: 8 }}>
                     {roomMaintenanceRecords.map((rec, idx) => {
                       const isSelected = selectedMaintenanceId === rec.id;
-                      const dueNum = Number(rec.remainingBalance || 0);
-                      const totalNum = Number(rec.totalAmount || 0);
-                      const monthLabel = rec.billingMonth
-                        ? new Date(rec.billingMonth).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
-                        : `Record #${rec.id}`;
+                      const totalNum = Number(rec.totalAmount ?? rec.amount ?? 0);
+                      const dueNum = Number(
+                        rec.remainingBalance ??
+                        rec.remainingAmount ??
+                        (rec.status === 'PAID' ? 0 : totalNum)
+                      );
+                      const isCleared = dueNum <= 0 || rec.status === 'PAID';
+
+                      let monthLabel = `Record #${rec.id}`;
+                      if (rec.billingMonth) {
+                        const parts = String(rec.billingMonth).split('-');
+                        if (parts.length >= 2) {
+                          const yr = parseInt(parts[0], 10);
+                          const mo = parseInt(parts[1], 10) - 1;
+                          const d = new Date(yr, mo, 1);
+                          if (!isNaN(d.getTime())) {
+                            monthLabel = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+                          }
+                        }
+                      }
 
                       return (
                         <TouchableOpacity
                           key={`maint-${rec.id ?? idx}`}
-                          onPress={() => setSelectedMaintenanceId(isSelected && verifyModalItem?.type !== 'cash' ? null : rec.id)}
+                          disabled={isCleared}
+                          onPress={() => {
+                            if (isCleared) {
+                              Alert.alert('Bill Cleared', 'This maintenance bill is already fully paid.');
+                              return;
+                            }
+                            setSelectedMaintenanceId(isSelected && verifyModalItem?.type !== 'cash' ? null : rec.id);
+                          }}
                           style={{
                             padding: 12,
                             borderRadius: 14,
-                            backgroundColor: isSelected ? '#FFF7ED' : '#FFFFFF',
+                            backgroundColor: isCleared ? '#F8FAFC' : isSelected ? '#FFF7ED' : '#FFFFFF',
                             borderWidth: 1.5,
-                            borderColor: isSelected ? '#F57C00' : '#E2E8F0',
+                            borderColor: isCleared ? '#E2E8F0' : isSelected ? '#F57C00' : '#E2E8F0',
                             flexDirection: 'row',
                             justifyContent: 'space-between',
                             alignItems: 'center',
+                            opacity: isCleared ? 0.65 : 1,
                           }}
                         >
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                             <Ionicons
-                              name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                              name={isCleared ? 'checkmark-circle' : isSelected ? 'radio-button-on' : 'radio-button-off'}
                               size={18}
-                              color={isSelected ? '#F57C00' : '#94A3B8'}
+                              color={isCleared ? '#16A34A' : isSelected ? '#F57C00' : '#94A3B8'}
                             />
                             <View>
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: isSelected ? '#C2410C' : '#0F172A' }}>
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: isCleared ? '#64748B' : isSelected ? '#C2410C' : '#0F172A' }}>
                                 {monthLabel} Maintenance
                               </Text>
                               <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 1 }}>
@@ -2506,6 +2609,41 @@ export default function AdminDashboardScreen({
                         </TouchableOpacity>
                       );
                     })}
+
+                    {roomMaintenanceRecords.every((r) => r.status === 'PAID' || Number(r.remainingBalance ?? r.remainingAmount ?? 0) <= 0) ? (
+                      <View style={{ backgroundColor: '#F0FDF4', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#BBF7D0', marginTop: 4 }}>
+                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#15803D' }}>
+                          ✓ All Existing Bills Cleared
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: '#166534', marginTop: 2 }}>
+                          All recorded maintenance bills for Room {verifyModalItem?.room} are fully settled.
+                        </Text>
+                        <TouchableOpacity
+                          onPress={handleGenerateNextMonthBill}
+                          disabled={isGeneratingMaintenance}
+                          style={{
+                            marginTop: 8,
+                            backgroundColor: '#16A34A',
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                            alignSelf: 'flex-start',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          {isGeneratingMaintenance ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
+                          )}
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                            {isGeneratingMaintenance ? 'Generating...' : '+ Generate Next Month Bill'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
                   </View>
                 ) : (
                   <View
@@ -2520,11 +2658,30 @@ export default function AdminDashboardScreen({
                     <Text style={{ fontSize: 12.5, color: '#64748B' }}>
                       No maintenance bills registered for Room {verifyModalItem?.room}.
                     </Text>
-                    {verifyModalItem?.type === 'cash' ? (
-                      <Text style={{ fontSize: 11.5, color: '#DC2626', fontWeight: '600', marginTop: 4 }}>
-                        ⚠️ Cash payments require an existing maintenance record to allocate funds.
+                    <TouchableOpacity
+                      onPress={handleGenerateNextMonthBill}
+                      disabled={isGeneratingMaintenance}
+                      style={{
+                        marginTop: 8,
+                        backgroundColor: '#F57C00',
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        borderRadius: 8,
+                        alignSelf: 'flex-start',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      {isGeneratingMaintenance ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
+                      )}
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                        {isGeneratingMaintenance ? 'Generating...' : '+ Generate Bill for Current Month'}
                       </Text>
-                    ) : null}
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>

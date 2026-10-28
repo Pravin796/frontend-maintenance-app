@@ -323,6 +323,11 @@ export const getMaintenanceByRoomAndMonth = async (roomId, billingMonth) => {
   return response.data;
 };
 
+export const createMaintenance = async ({ roomId, billingMonth }) => {
+  const response = await api.post('/maintenance', { roomId, billingMonth });
+  return response.data;
+};
+
 /**
  * Rooms API
  */
@@ -388,6 +393,7 @@ export const adminApi = {
   getAllocationsByMaintenance,
   getMaintenanceByRoom,
   getMaintenanceByRoomAndMonth,
+  createMaintenance,
   getAllRooms,
   getRoomById,
   getRoomByNumber,
