@@ -241,7 +241,7 @@ export default function OnlinePaymentScreen({
     if (localImageUri && !uploadedUrl) {
       Alert.alert(
         'Upload Required',
-        'Please tap "Upload Image" to upload your selected screenshot before submitting.'
+        'Please tap "Upload" to upload your selected screenshot before submitting.'
       );
       return;
     }
@@ -1157,7 +1157,7 @@ export default function OnlinePaymentScreen({
                   <>
                     <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                      Uploading to Cloudinary...
+                      Uploading...
                     </Text>
                   </>
                 ) : (
@@ -1169,7 +1169,7 @@ export default function OnlinePaymentScreen({
                       style={{ marginRight: 6 }}
                     />
                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                      Upload Image to Cloud
+                      Upload
                     </Text>
                   </>
                 )}
@@ -1276,7 +1276,7 @@ export default function OnlinePaymentScreen({
               style={{ marginRight: 8 }}
             />
             <Text style={{ fontSize: 11.5, color: '#92400E', flex: 1, fontWeight: '500' }}>
-              Please tap &quot;Upload Image to Cloud&quot; above before submitting your verification.
+              Please tap &quot;Upload&quot; above before submitting your verification.
             </Text>
           </View>
         )}

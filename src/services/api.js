@@ -5,7 +5,7 @@ import { tokenStorage } from './tokenStorage';
 
 export const api = axios.create({
   baseURL: ENV.API_URL,
-  adapter: ['fetch', 'xhr'],
+  adapter: ['xhr', 'fetch'],
   headers: {
     'Content-Type': 'application/json',
   },
@@ -135,13 +135,67 @@ export const uploadImage = async (uri, folder = 'payment_proofs') => {
     formData.append('folder', folder);
   }
 
-  const response = await api.post('/uploads/image', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-    transformRequest: (data) => data,
+  const token = await tokenStorage.getToken();
+  const uploadUrl = `${ENV.API_URL}/uploads/image`;
+
+  console.log(`[API Request] POST ${uploadUrl}`, {
+    filename,
+    type,
+    folder,
   });
-  return response.data;
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', uploadUrl);
+    xhr.timeout = 60000;
+
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+
+    // In React Native, do NOT explicitly set Content-Type for FormData.
+    // React Native's native NetworkingModule will automatically set
+    // 'multipart/form-data; boundary=...' with the correct boundary parameter.
+
+    xhr.onload = () => {
+      let data;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = { message: xhr.responseText };
+      }
+
+      console.log(`[API Response] ${xhr.status} POST ${uploadUrl}`, data);
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const error = new Error(
+          data?.message || `Upload failed with status ${xhr.status}`
+        );
+        error.response = { status: xhr.status, data };
+        console.error(`[API Response Error] ${xhr.status} POST ${uploadUrl}`, {
+          message: error.message,
+          data,
+        });
+        reject(error);
+      }
+    };
+
+    xhr.onerror = (e) => {
+      console.error('[API Request Error] Upload network error', e);
+      const error = new Error('Network error during image upload. Please check your connection.');
+      reject(error);
+    };
+
+    xhr.ontimeout = () => {
+      console.error('[API Request Error] Upload timed out');
+      const error = new Error('Image upload timed out. Please try again.');
+      reject(error);
+    };
+
+    xhr.send(formData);
+  });
 };
 
 export const updatePaymentProof = async (paymentId, { transactionReference, screenshotUrl, screenshotPublicId }) => {
