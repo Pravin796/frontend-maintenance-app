@@ -33,6 +33,7 @@ import {
   verifyCashRequest,
   rejectCashRequest,
   getPendingOnlinePayments,
+  getVerifiedPayments,
   verifyOnlinePayment,
   rejectOnlinePayment,
   createPaymentAllocation,
@@ -183,9 +184,10 @@ export default function AdminDashboardScreen({
     }
     setPaymentsError(null);
     try {
-      const [cashRes, onlineRes] = await Promise.allSettled([
+      const [cashRes, onlineRes, verifiedRes] = await Promise.allSettled([
         getPendingCashRequests(),
         getPendingOnlinePayments(),
+        getVerifiedPayments(),
       ]);
 
       const cashItems =
@@ -219,7 +221,7 @@ export default function AdminDashboardScreen({
               amount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
               rawAmount: Number(p.amount || 0),
               type: 'online',
-              method: p.paymentMode === 'ONLINE' ? 'UPI / Online' : (p.paymentMode || 'Online Payment'),
+              method: p.method === 'CASH' ? 'Cash Payment' : (p.paymentMode === 'ONLINE' ? 'UPI / Online' : (p.paymentMode || 'Online Payment')),
               refId: p.transactionReference || 'UTR-PENDING',
               date: formatDateTime(p.createdAt),
               status: 'pending',
@@ -228,12 +230,38 @@ export default function AdminDashboardScreen({
             }))
           : [];
 
-      if (cashRes.status === 'rejected' && onlineRes.status === 'rejected') {
-        const err = cashRes.reason || onlineRes.reason;
+      const verifiedItems =
+        verifiedRes.status === 'fulfilled' && Array.isArray(verifiedRes.value)
+          ? verifiedRes.value.map((p) => {
+              const isCash = p.method === 'CASH';
+              return {
+                id: `verified_${p.id}`,
+                backendId: p.id,
+                roomId: p.roomId,
+                room: p.roomNumber || (p.roomId ? String(p.roomId) : 'Unknown'),
+                resident: `Room ${p.roomNumber || ''} Resident`,
+                amount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
+                rawAmount: Number(p.amount || 0),
+                verifiedAmount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
+                type: isCash ? 'cash' : 'online',
+                method: isCash ? 'Cash Payment' : 'UPI / Online',
+                refId: p.transactionReference || (isCash ? 'Cash Verified' : 'UTR-VERIFIED'),
+                date: formatDateTime(p.verifiedAt || p.createdAt),
+                status: 'verified',
+                adminRemark: isCash ? 'Cash verified and allocated' : 'Online payment verified',
+                screenshotUrl: p.screenshotUrl || null,
+                originalData: p,
+              };
+            })
+          : [];
+
+      if (cashRes.status === 'rejected' && onlineRes.status === 'rejected' && verifiedRes.status === 'rejected') {
+        const err = cashRes.reason || onlineRes.reason || verifiedRes.reason;
         throw err;
       }
 
       setPendingPayments([...cashItems, ...onlineItems]);
+      setVerifiedHistory(verifiedItems);
     } catch (err) {
       console.warn('Failed to load pending payments:', err?.message || err);
       if (err?.response?.status === 403) {
@@ -388,17 +416,12 @@ export default function AdminDashboardScreen({
   const heroRemainingStr = formatCurrency(backendOutstandingNum);
   const totalPendingDuesStr = formatCurrency(backendOutstandingNum);
 
-  const onlinePendingCount = dashboardData?.pendingOnlinePayments != null
-    ? Number(dashboardData.pendingOnlinePayments)
-    : payments.filter((p) => p.type === 'online' && p.status === 'pending').length;
-
-  const cashPendingCount = dashboardData?.pendingCashRequests != null
-    ? Number(dashboardData.pendingCashRequests)
-    : payments.filter((p) => p.type === 'cash' && p.status === 'pending').length;
-
-  const verifiedCount = dashboardData?.verifiedCashPayments != null
-    ? Number(dashboardData.verifiedCashPayments)
-    : payments.filter((p) => p.status === 'verified').length;
+  const onlinePendingCount = pendingPayments.filter((p) => p.type === 'online').length;
+  const cashPendingCount = pendingPayments.filter((p) => p.type === 'cash').length;
+  const totalPendingCount = pendingPayments.length;
+  const verifiedCount = verifiedHistory.length > 0
+    ? verifiedHistory.length
+    : (dashboardData?.verifiedCashPayments != null ? Number(dashboardData.verifiedCashPayments) : 0);
 
   const handleLogoutConfirm = () => {
     Alert.alert('Logout', 'Are you sure you want to log out of Admin Dashboard?', [
@@ -1182,6 +1205,8 @@ export default function AdminDashboardScreen({
           <View style={{ width: screenWidth, flex: 1 }}>
             <ScrollView
               ref={paymentsScrollRef}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={{
                 paddingHorizontal: 20,
                 paddingTop: 8,
@@ -1203,11 +1228,13 @@ export default function AdminDashboardScreen({
               {/* Filter Pills */}
               <ScrollView
                 horizontal
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ gap: 8, marginBottom: 18 }}
               >
                 {[
-                  { key: 'all', label: `Pending (${payments.filter((p) => p.status === 'pending').length})` },
+                  { key: 'all', label: `Pending (${totalPendingCount})` },
                   { key: 'online', label: `Online (${onlinePendingCount})` },
                   { key: 'cash', label: `Cash (${cashPendingCount})` },
                   { key: 'verified', label: `Verified (${verifiedCount})` },
@@ -1217,6 +1244,8 @@ export default function AdminDashboardScreen({
                     <TouchableOpacity
                       key={filter.key}
                       onPress={() => setPaymentFilter(filter.key)}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                       style={{
                         paddingHorizontal: 16,
                         paddingVertical: 9,
@@ -1321,6 +1350,12 @@ export default function AdminDashboardScreen({
                 filteredPayments.map((p) => {
                   const isOnline = p.type === 'online';
                   const isPending = p.status === 'pending';
+                  const roomPendingMatches = pendingPayments.filter(
+                    (item) => String(item.roomId) === String(p.roomId) || (item.room && String(item.room) === String(p.room))
+                  );
+                  const isDuplicatePendingForRoom = isPending && roomPendingMatches.length > 1;
+                  const siblingPending = roomPendingMatches.find((item) => item.id !== p.id);
+                  const siblingTypeLabel = siblingPending?.type === 'cash' ? 'Cash Handover' : 'Online UPI';
 
                   return (
                     <View
@@ -1341,6 +1376,34 @@ export default function AdminDashboardScreen({
                         elevation: 2,
                       }}
                     >
+                      {/* Duplicate Review Notice (e.g. Room has both Online and Cash pending) */}
+                      {isDuplicatePendingForRoom && (
+                        <View
+                          style={{
+                            backgroundColor: '#FFFBEB',
+                            borderRadius: 12,
+                            paddingHorizontal: 12,
+                            paddingVertical: 9,
+                            marginBottom: 12,
+                            borderWidth: 1,
+                            borderColor: '#FDE68A',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                          }}
+                        >
+                          <Ionicons name="warning-outline" size={18} color="#D97706" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309' }}>
+                              Duplicate Review (Room {p.room})
+                            </Text>
+                            <Text style={{ fontSize: 11.5, color: '#92400E', marginTop: 1 }}>
+                              This room also has a pending {siblingTypeLabel} request. Verify one and reject the duplicate, or generate next month's bill to verify both.
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
                       {/* Top Header Row: Room & Type Badges (Left) + Amount Stack (Right) */}
                       <View
                         style={{
@@ -2526,8 +2589,45 @@ export default function AdminDashboardScreen({
                   </View>
                 ) : roomMaintenanceRecords.length > 0 ? (
                   <View style={{ gap: 8 }}>
+                    {roomMaintenanceRecords.every((r) => r.status === 'PAID' || Number(r.remainingBalance ?? r.remainingAmount ?? 0) <= 0) && (
+                      <View style={{ backgroundColor: '#FFFBEB', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#FDE68A', marginBottom: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="information-circle" size={18} color="#D97706" />
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#B45309' }}>
+                            All Existing Bills Cleared (Due: ₹0)
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 11.5, color: '#92400E', marginTop: 4 }}>
+                          All recorded maintenance bills for Room {verifyModalItem?.room} are fully paid. To verify this payment, generate the next month's bill below, or reject this request if it was submitted as an accidental duplicate.
+                        </Text>
+                        <TouchableOpacity
+                          onPress={handleGenerateNextMonthBill}
+                          disabled={isGeneratingMaintenance}
+                          style={{
+                            marginTop: 10,
+                            backgroundColor: '#EA580C',
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                            alignSelf: 'flex-start',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          {isGeneratingMaintenance ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
+                          )}
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                            {isGeneratingMaintenance ? 'Generating...' : '+ Generate Next Month Bill'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
                     {roomMaintenanceRecords.map((rec, idx) => {
-                      const isSelected = selectedMaintenanceId === rec.id;
                       const totalNum = Number(rec.totalAmount ?? rec.amount ?? 0);
                       const dueNum = Number(
                         rec.remainingBalance ??
@@ -2535,6 +2635,7 @@ export default function AdminDashboardScreen({
                         (rec.status === 'PAID' ? 0 : totalNum)
                       );
                       const isCleared = dueNum <= 0 || rec.status === 'PAID';
+                      const isSelected = !isCleared && selectedMaintenanceId === rec.id;
 
                       let monthLabel = `Record #${rec.id}`;
                       if (rec.billingMonth) {
@@ -2609,41 +2710,6 @@ export default function AdminDashboardScreen({
                         </TouchableOpacity>
                       );
                     })}
-
-                    {roomMaintenanceRecords.every((r) => r.status === 'PAID' || Number(r.remainingBalance ?? r.remainingAmount ?? 0) <= 0) ? (
-                      <View style={{ backgroundColor: '#F0FDF4', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#BBF7D0', marginTop: 4 }}>
-                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#15803D' }}>
-                          ✓ All Existing Bills Cleared
-                        </Text>
-                        <Text style={{ fontSize: 11.5, color: '#166534', marginTop: 2 }}>
-                          All recorded maintenance bills for Room {verifyModalItem?.room} are fully settled.
-                        </Text>
-                        <TouchableOpacity
-                          onPress={handleGenerateNextMonthBill}
-                          disabled={isGeneratingMaintenance}
-                          style={{
-                            marginTop: 8,
-                            backgroundColor: '#16A34A',
-                            paddingVertical: 8,
-                            paddingHorizontal: 12,
-                            borderRadius: 8,
-                            alignSelf: 'flex-start',
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                        >
-                          {isGeneratingMaintenance ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
-                          )}
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
-                            {isGeneratingMaintenance ? 'Generating...' : '+ Generate Next Month Bill'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
                   </View>
                 ) : (
                   <View

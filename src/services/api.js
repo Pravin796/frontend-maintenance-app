@@ -272,6 +272,11 @@ export const getPendingOnlinePayments = async () => {
   return response.data;
 };
 
+export const getVerifiedPayments = async () => {
+  const response = await api.get('/payments/admin/verified');
+  return response.data;
+};
+
 export const verifyOnlinePayment = async (paymentId) => {
   const response = await api.put(`/payments/${paymentId}/verify`);
   return response.data;
@@ -384,6 +389,7 @@ export const adminApi = {
   getCashRequestById,
   getCashRequestsByRoom,
   getPendingOnlinePayments,
+  getVerifiedPayments,
   verifyOnlinePayment,
   rejectOnlinePayment,
   getPaymentById,
