@@ -26,6 +26,7 @@ import PaymentScreen from './PaymentScreen';
 import OnlinePaymentScreen from './OnlinePaymentScreen';
 import CashPaymentScreen from './CashPaymentScreen';
 import { getUserDashboard, getMyPayments, getMyMaintenance } from '../src/services/api';
+import { confirmAction } from '../src/utils/alert';
 
 const TAB_ORDER = ['home', 'payments', 'history', 'profile'];
 
@@ -36,12 +37,8 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   const [activeTab, setActiveTab] = useState('home');
   const [notificationsVisible, setNotificationsVisible] = useState(false);
 
-  // Horizontal pager animation for smooth, 100% flicker-free sliding between tabs
-  const pagerAnim = useRef(new Animated.Value(0)).current;
-
-  // Sub-page pager animation for Payments <-> Online Payment <-> Cash Payment transition
-  const [paymentSubView, setPaymentSubView] = useState('main'); // 'main' | 'online' | 'cash'
-  const paymentSubPagerAnim = useRef(new Animated.Value(0)).current;
+  // Sub-page view state: 'main' | 'online' | 'cash'
+  const [paymentSubView, setPaymentSubView] = useState('main');
 
   // Separate scroll view refs for each tab
   const homeScrollRef = useRef(null);
@@ -159,73 +156,28 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   const currentMaintenance = dashboardData?.currentMaintenance || null;
   const recentPayment = dashboardData?.recentPayment || null;
 
-  // Keep pager aligned if screen orientation or dimensions change
-  useEffect(() => {
-    const idx = TAB_ORDER.indexOf(activeTab);
-    pagerAnim.setValue(-idx * screenWidth);
-    paymentSubPagerAnim.setValue(
-      paymentSubView === 'online'
-        ? -screenWidth
-        : paymentSubView === 'cash'
-          ? -2 * screenWidth
-          : 0
-    );
-  }, [screenWidth, activeTab, paymentSubView, pagerAnim, paymentSubPagerAnim]);
+
 
   const handleOpenOnlinePayment = useCallback(() => {
+    setActiveTab('payments');
     setPaymentSubView('online');
-    Animated.timing(paymentSubPagerAnim, {
-      toValue: -screenWidth,
-      duration: 250,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      useNativeDriver: true,
-    }).start();
-  }, [screenWidth, paymentSubPagerAnim]);
+  }, []);
 
   const handleOpenCashPayment = useCallback(() => {
+    setActiveTab('payments');
     setPaymentSubView('cash');
-    Animated.timing(paymentSubPagerAnim, {
-      toValue: -2 * screenWidth,
-      duration: 250,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      useNativeDriver: true,
-    }).start();
-  }, [screenWidth, paymentSubPagerAnim]);
+  }, []);
 
   const handleBackToMainPayments = useCallback(() => {
     setPaymentSubView('main');
-    Animated.timing(paymentSubPagerAnim, {
-      toValue: 0,
-      duration: 250,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      useNativeDriver: true,
-    }).start();
-  }, [paymentSubPagerAnim]);
+  }, []);
 
   const handleLogoutConfirm = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: onLogout },
-    ]);
+    confirmAction('Logout', 'Are you sure you want to log out of your account?', onLogout, 'Logout');
   };
 
-  /**
-   * Continuous, hardware-accelerated slide between tabs with zero flicker
-   */
   const handleTabPress = useCallback(
     (nextTab) => {
-      if (nextTab === activeTab) {
-        // Scroll active tab to top
-        if (nextTab === 'home') homeScrollRef.current?.scrollTo({ y: 0, animated: true });
-        else if (nextTab === 'payments') paymentsScrollRef.current?.scrollTo({ y: 0, animated: true });
-        else if (nextTab === 'history') historyScrollRef.current?.scrollTo({ y: 0, animated: true });
-        else if (nextTab === 'profile') profileScrollRef.current?.scrollTo({ y: 0, animated: true });
-        return;
-      }
-
-      const nextIndex = TAB_ORDER.indexOf(nextTab);
-
-      // Subtle spring bounce on pressed tab icon
       if (tabScaleAnims[nextTab]) {
         tabScaleAnims[nextTab].setValue(0.85);
         Animated.spring(tabScaleAnims[nextTab], {
@@ -236,17 +188,13 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
         }).start();
       }
 
-      setActiveTab(nextTab);
+      if (nextTab === 'payments') {
+        setPaymentSubView('main');
+      }
 
-      // Smooth continuous glide to the selected tab with zero unmount/remount
-      Animated.timing(pagerAnim, {
-        toValue: -nextIndex * screenWidth,
-        duration: 250,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-        useNativeDriver: true,
-      }).start();
+      setActiveTab(nextTab);
     },
-    [activeTab, screenWidth, pagerAnim, tabScaleAnims]
+    [tabScaleAnims]
   );
 
   return (
@@ -288,18 +236,10 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
         }}
       />
 
-      {/* Horizontal Sliding Pager Container (zero-flicker native translation) */}
-      <View style={{ flex: 1, overflow: 'hidden' }}>
-        <Animated.View
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            width: screenWidth * 4,
-            transform: [{ translateX: pagerAnim }],
-          }}
-        >
-          {/* TAB 0: HOME */}
-          <View style={{ width: screenWidth, flex: 1 }}>
+      {/* Active Tab Content Container */}
+      <View style={{ flex: 1 }}>
+        {activeTab === 'home' && (
+          <View style={{ flex: 1 }}>
             <ScrollView
               ref={homeScrollRef}
               contentContainerStyle={{
@@ -407,10 +347,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                 variant="balance"
                 title="Outstanding Balance"
                 amount={formatCurrency(outstandingBalance)}
-                onActionPress={() => {
-                  handleTabPress('payments');
-                  handleOpenOnlinePayment();
-                }}
+                onActionPress={handleOpenOnlinePayment}
               />
 
               {/* Monthly Maintenance Card */}
@@ -647,10 +584,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                 {/* Tile 1: Make Payment */}
                 <TouchableOpacity
                   activeOpacity={0.82}
-                  onPress={() => {
-                    handleTabPress('payments');
-                    handleOpenOnlinePayment();
-                  }}
+                  onPress={handleOpenOnlinePayment}
                   style={{
                     flex: 1,
                     backgroundColor: '#FFFFFF',
@@ -793,19 +727,13 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               </View>
             </ScrollView>
           </View>
+        )}
 
-          {/* TAB 1: PAYMENTS (with horizontal slide to Online Payment & Cash Payment) */}
-          <View style={{ width: screenWidth, flex: 1, overflow: 'hidden' }}>
-            <Animated.View
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                width: screenWidth * 3,
-                transform: [{ translateX: paymentSubPagerAnim }],
-              }}
-            >
-              {/* SUB-VIEW 0: Main Payments Screen */}
-              <View style={{ width: screenWidth, flex: 1 }}>
+        {/* TAB 1: PAYMENTS */}
+        {activeTab === 'payments' && (
+          <View style={{ flex: 1 }}>
+            {paymentSubView === 'main' && (
+              <View style={{ flex: 1 }}>
                 <ScrollView
                   ref={paymentsScrollRef}
                   contentContainerStyle={{
@@ -843,9 +771,11 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   />
                 </ScrollView>
               </View>
+            )}
 
-              {/* SUB-VIEW 1: Online Payment Screen (from screenshot) */}
-              <View style={{ width: screenWidth, flex: 1 }}>
+            {/* SUB-VIEW 1: Online Payment Screen */}
+            {paymentSubView === 'online' && (
+              <View style={{ flex: 1 }}>
                 <OnlinePaymentScreen
                   user={{
                     ...user,
@@ -867,9 +797,11 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   }}
                 />
               </View>
+            )}
 
-              {/* SUB-VIEW 2: Cash Payment Screen (from screenshot) */}
-              <View style={{ width: screenWidth, flex: 1 }}>
+            {/* SUB-VIEW 2: Cash Payment Screen */}
+            {paymentSubView === 'cash' && (
+              <View style={{ flex: 1 }}>
                 <CashPaymentScreen
                   user={{
                     ...user,
@@ -885,11 +817,13 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   }}
                 />
               </View>
-            </Animated.View>
+            )}
           </View>
+        )}
 
-          {/* TAB 2: HISTORY */}
-          <View style={{ width: screenWidth, flex: 1 }}>
+        {/* TAB 2: HISTORY */}
+        {activeTab === 'history' && (
+          <View style={{ flex: 1 }}>
             <ScrollView
               ref={historyScrollRef}
               contentContainerStyle={{
@@ -988,9 +922,11 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               </View>
             </ScrollView>
           </View>
+        )}
 
-          {/* TAB 3: PROFILE */}
-          <View style={{ width: screenWidth, flex: 1 }}>
+        {/* TAB 3: PROFILE */}
+        {activeTab === 'profile' && (
+          <View style={{ flex: 1 }}>
             <ScrollView
               ref={profileScrollRef}
               contentContainerStyle={{
@@ -1038,6 +974,25 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                     +91 {user.mobileNumber}
                   </Text>
                 ) : null}
+
+                <TouchableOpacity
+                  onPress={handleLogoutConfirm}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#FEE2E2',
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: 20,
+                    marginTop: 12,
+                    borderWidth: 1,
+                    borderColor: '#FECACA',
+                  }}
+                >
+                  <Ionicons name="log-out-outline" size={16} color="#DC2626" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>Sign Out</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Profile Action Options */}
@@ -1105,7 +1060,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </Animated.View>
+        )}
       </View>
 
       {/* Notifications Modal */}

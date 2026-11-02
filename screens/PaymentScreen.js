@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -324,7 +324,7 @@ export default function PaymentScreen({
           </Text>
 
           <TouchableOpacity
-            onPress={() => setHistoryModalVisible(true)}
+            onPress={() => (onNavigateHistory ? onNavigateHistory() : setHistoryModalVisible(true))}
             activeOpacity={0.7}
             style={{ flexDirection: 'row', alignItems: 'center' }}
           >
