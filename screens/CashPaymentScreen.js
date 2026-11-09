@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+﻿import React, { useState, memo } from 'react';
 import {
   View,
   Text,
@@ -136,6 +136,44 @@ export default function CashPaymentScreen({
       }}
       showsVerticalScrollIndicator={false}
     >
+      {/* Top Back Navigation Button */}
+      {onBack && (
+        <TouchableOpacity
+          onPress={onBack}
+          activeOpacity={0.7}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 14,
+            paddingVertical: 6,
+          }}
+        >
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: '#FFFFFF',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: 10,
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04,
+              shadowRadius: 2,
+              elevation: 1,
+            }}
+          >
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
+          </View>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: '#1E293B' }}>
+            Back to Payments
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* 1. Card: Declare Cash Payment */}
       <View
         style={{

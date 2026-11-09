@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { confirmAction } from '../src/utils/alert';
 import {
   HeroGradientCard,
   StatCard,
@@ -64,8 +65,6 @@ export default function AdminDashboardScreen({
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
 
-  // Horizontal pager animation for smooth, 100% flicker-free sliding between tabs
-  const pagerAnim = useRef(new Animated.Value(0)).current;
 
   // Separate scroll view refs for each tab
   const dashboardScrollRef = useRef(null);
@@ -325,11 +324,6 @@ export default function AdminDashboardScreen({
     }
   }, [user, navigation]);
 
-  // Keep pager aligned if screen orientation or dimensions change
-  useEffect(() => {
-    const idx = TAB_ORDER.indexOf(activeTab);
-    pagerAnim.setValue(-idx * screenWidth);
-  }, [screenWidth, activeTab, pagerAnim]);
 
   const handleTabPress = useCallback(
     (nextTab) => {
@@ -361,15 +355,8 @@ export default function AdminDashboardScreen({
       }
 
       setActiveTab(nextTab);
-
-      Animated.timing(pagerAnim, {
-        toValue: -nextIndex * screenWidth,
-        duration: 250,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-        useNativeDriver: true,
-      }).start();
     },
-    [activeTab, screenWidth, pagerAnim, tabScaleAnims]
+    [activeTab, liveRooms.length, fetchRoomsAndResidentsData, tabScaleAnims]
   );
 
   if (user?.role !== 'ADMIN') {
@@ -424,10 +411,7 @@ export default function AdminDashboardScreen({
     : (dashboardData?.verifiedCashPayments != null ? Number(dashboardData.verifiedCashPayments) : 0);
 
   const handleLogoutConfirm = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out of Admin Dashboard?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: onLogout },
-    ]);
+    confirmAction('Logout', 'Are you sure you want to log out of Admin Dashboard?', onLogout, 'Logout');
   };
 
   const handleCopyRef = (refId) => {
@@ -916,18 +900,10 @@ export default function AdminDashboardScreen({
         onPressLogo={() => handleTabPress('dashboard')}
       />
 
-      {/* Horizontal Sliding Pager Container (zero-flicker native translation) */}
-      <View style={{ flex: 1, overflow: 'hidden' }}>
-        <Animated.View
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            width: screenWidth * 4,
-            transform: [{ translateX: pagerAnim }],
-          }}
-        >
-          {/* TAB 0: DASHBOARD */}
-          <View style={{ width: screenWidth, flex: 1 }}>
+      {/* Active Tab Content Container */}
+      <View style={{ flex: 1 }}>
+        {activeTab === 'dashboard' && (
+          <View style={{ flex: 1 }}>
             <ScrollView
               ref={dashboardScrollRef}
               contentContainerStyle={{
@@ -1198,9 +1174,11 @@ export default function AdminDashboardScreen({
               </View>
             </ScrollView>
           </View>
+        )}
 
-          {/* TAB 1: PAYMENTS */}
-          <View style={{ width: screenWidth, flex: 1 }}>
+        {/* TAB 1: PAYMENTS */}
+        {activeTab === 'payments' && (
+          <View style={{ flex: 1 }}>
             <ScrollView
               ref={paymentsScrollRef}
               nestedScrollEnabled={true}
@@ -1760,9 +1738,11 @@ export default function AdminDashboardScreen({
               )}
             </ScrollView>
           </View>
+        )}
 
-          {/* TAB 2: ROOMS */}
-          <View style={{ width: screenWidth, flex: 1 }}>
+        {/* TAB 2: ROOMS */}
+        {activeTab === 'rooms' && (
+          <View style={{ flex: 1 }}>
             <ScrollView
               ref={roomsScrollRef}
               contentContainerStyle={{
@@ -2084,9 +2064,11 @@ export default function AdminDashboardScreen({
               )}
             </ScrollView>
           </View>
+        )}
 
-          {/* TAB 3: PROFILE */}
-          <View style={{ width: screenWidth, flex: 1 }}>
+        {/* TAB 3: PROFILE */}
+        {activeTab === 'profile' && (
+          <View style={{ flex: 1 }}>
             <ScrollView
               ref={profileScrollRef}
               contentContainerStyle={{
@@ -2225,7 +2207,7 @@ export default function AdminDashboardScreen({
               </View>
             </ScrollView>
           </View>
-        </Animated.View>
+        )}
       </View>
 
       {/* Notifications Modal */}

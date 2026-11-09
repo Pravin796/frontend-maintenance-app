@@ -12,6 +12,8 @@ import RegisterScreen from './screens/RegisterScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import AdminDashboardScreen from './screens/AdminDashboardScreen';
 import PaymentScreen from './screens/PaymentScreen';
+import OnlinePaymentScreen from './screens/OnlinePaymentScreen';
+import CashPaymentScreen from './screens/CashPaymentScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import { Asset } from 'expo-asset';
@@ -228,6 +230,8 @@ export default function App() {
                 user={currentUser}
                 onLogout={handleLogout}
                 onChangePassword={() => props.navigation.navigate('ChangePassword')}
+                onNavigateOnlinePayment={() => props.navigation.navigate('OnlinePayment')}
+                onNavigateCashPayment={() => props.navigation.navigate('CashPayment')}
                 onNavigateAdmin={
                   currentUser?.role === 'ADMIN'
                     ? () => {
@@ -269,7 +273,35 @@ export default function App() {
                 onNavigateHome={() => props.navigation.navigate('Dashboard')}
                 onNavigateHistory={() => props.navigation.navigate('Dashboard')}
                 onNavigateProfile={() => props.navigation.navigate('Dashboard')}
+                onNavigateOnlinePayment={() => props.navigation.navigate('OnlinePayment')}
+                onNavigateCashPayment={() => props.navigation.navigate('CashPayment')}
                 onLogout={handleLogout}
+              />
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="OnlinePayment">
+            {(props) => (
+              <OnlinePaymentScreen
+                {...props}
+                user={currentUser}
+                outstandingAmount={props.route?.params?.outstandingAmount || '₹1,500'}
+                billingMonth={props.route?.params?.billingMonth || 'Current Month'}
+                onBack={() => props.navigation.goBack()}
+                onSubmitVerification={() => props.navigation.goBack()}
+              />
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="CashPayment">
+            {(props) => (
+              <CashPaymentScreen
+                {...props}
+                user={currentUser}
+                outstandingAmount={props.route?.params?.outstandingAmount || '₹1,500'}
+                defaultAmount={props.route?.params?.defaultAmount || '500'}
+                onBack={() => props.navigation.goBack()}
+                onSubmitCashPayment={() => props.navigation.goBack()}
               />
             )}
           </Stack.Screen>

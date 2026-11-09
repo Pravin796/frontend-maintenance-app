@@ -207,6 +207,94 @@ export const updatePaymentProof = async (paymentId, { transactionReference, scre
   return response.data;
 };
 
+/**
+ * Submit payment proof (Screenshot + UTR / Transaction Reference in a single multipart request)
+ * POST /api/payments/{id}/submit-proof
+ */
+export const submitPaymentProof = async (paymentId, { transactionReference, imageUri }) => {
+  const formData = new FormData();
+  formData.append('transactionReference', transactionReference);
+
+  if (imageUri) {
+    const rawFilename = imageUri.split('/').pop() || 'proof.jpg';
+    const filename = rawFilename.includes('.') ? rawFilename : `${rawFilename}.jpg`;
+    const match = /\.(\w+)$/.exec(filename);
+    const ext = match ? match[1].toLowerCase() : 'jpg';
+    let type = 'image/jpeg';
+    if (ext === 'png') type = 'image/png';
+    else if (ext === 'webp') type = 'image/webp';
+    else if (ext === 'gif') type = 'image/gif';
+
+    formData.append('file', {
+      uri: imageUri,
+      name: filename,
+      type,
+    });
+  }
+
+  const token = await tokenStorage.getToken();
+  const endpointUrl = `${ENV.API_URL}/payments/${paymentId}/submit-proof`;
+
+  console.log(`[API Request] POST ${endpointUrl}`, {
+    paymentId,
+    transactionReference,
+    imageUri,
+  });
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', endpointUrl);
+    xhr.timeout = 60000;
+
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+
+    // In React Native, do NOT explicitly set Content-Type for FormData.
+    // React Native's native NetworkingModule will automatically set
+    // 'multipart/form-data; boundary=...' with the correct boundary parameter.
+
+    xhr.onload = () => {
+      let data;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = { message: xhr.responseText };
+      }
+
+      console.log(`[API Response] ${xhr.status} POST ${endpointUrl}`, data);
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const error = new Error(
+          data?.message || `Submission failed with status ${xhr.status}`
+        );
+        error.response = { status: xhr.status, data };
+        console.error(`[API Response Error] ${xhr.status} POST ${endpointUrl}`, {
+          message: error.message,
+          data,
+        });
+        reject(error);
+      }
+    };
+
+    xhr.onerror = (e) => {
+      console.error('[API Request Error] Submit proof network error', e);
+      const error = new Error('Network error during proof submission. Please check your connection.');
+      reject(error);
+    };
+
+    xhr.ontimeout = () => {
+      console.error('[API Request Error] Submit proof timed out');
+      const error = new Error('Proof submission timed out. Please try again.');
+      reject(error);
+    };
+
+    xhr.send(formData);
+  });
+};
+
 export const createCashPaymentRequest = async ({ amount, roomId }) => {
   const payload = { amount };
   if (roomId != null) {
@@ -223,6 +311,7 @@ export const userApi = {
   createPayment,
   uploadImage,
   updatePaymentProof,
+  submitPaymentProof,
   createCashPaymentRequest,
 };
 
