@@ -193,66 +193,66 @@ export default function AdminDashboardScreen({
       const cashItems =
         cashRes.status === 'fulfilled' && Array.isArray(cashRes.value)
           ? cashRes.value.map((c) => ({
-              id: `cash_${c.id}`,
-              backendId: c.id,
-              roomId: c.roomId,
-              room: c.roomNumber || (c.roomId ? String(c.roomId) : 'Unknown'),
-              resident: c.residentName || `Room ${c.roomNumber || ''} Resident`,
-              amount: `₹${Number(c.amount || 0).toLocaleString('en-IN')}`,
-              rawAmount: Number(c.amount || 0),
-              type: 'cash',
-              method: 'Cash Payment',
-              refId: c.residentNote || 'Cash handover at desk',
-              date: formatDateTime(c.createdAt),
-              status: 'pending',
-              screenshotUrl: null,
-              originalData: c,
-            }))
+            id: `cash_${c.id}`,
+            backendId: c.id,
+            roomId: c.roomId,
+            room: c.roomNumber || (c.roomId ? String(c.roomId) : 'Unknown'),
+            resident: c.residentName || `Room ${c.roomNumber || ''} Resident`,
+            amount: `₹${Number(c.amount || 0).toLocaleString('en-IN')}`,
+            rawAmount: Number(c.amount || 0),
+            type: 'cash',
+            method: 'Cash Payment',
+            refId: c.residentNote || 'Cash handover at desk',
+            date: formatDateTime(c.createdAt),
+            status: 'pending',
+            screenshotUrl: null,
+            originalData: c,
+          }))
           : [];
 
       const onlineItems =
         onlineRes.status === 'fulfilled' && Array.isArray(onlineRes.value)
           ? onlineRes.value.map((p) => ({
-              id: `online_${p.id}`,
+            id: `online_${p.id}`,
+            backendId: p.id,
+            roomId: p.roomId,
+            room: p.roomNumber || (p.roomId ? String(p.roomId) : 'Unknown'),
+            resident: `Room ${p.roomNumber || ''} Resident`,
+            amount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
+            rawAmount: Number(p.amount || 0),
+            type: 'online',
+            method: p.method === 'CASH' ? 'Cash Payment' : (p.paymentMode === 'ONLINE' ? 'UPI / Online' : (p.paymentMode || 'Online Payment')),
+            refId: p.transactionReference || 'UTR-PENDING',
+            date: formatDateTime(p.createdAt),
+            status: 'pending',
+            screenshotUrl: p.screenshotUrl || null,
+            originalData: p,
+          }))
+          : [];
+
+      const verifiedItems =
+        verifiedRes.status === 'fulfilled' && Array.isArray(verifiedRes.value)
+          ? verifiedRes.value.map((p) => {
+            const isCash = p.method === 'CASH';
+            return {
+              id: `verified_${p.id}`,
               backendId: p.id,
               roomId: p.roomId,
               room: p.roomNumber || (p.roomId ? String(p.roomId) : 'Unknown'),
               resident: `Room ${p.roomNumber || ''} Resident`,
               amount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
               rawAmount: Number(p.amount || 0),
-              type: 'online',
-              method: p.method === 'CASH' ? 'Cash Payment' : (p.paymentMode === 'ONLINE' ? 'UPI / Online' : (p.paymentMode || 'Online Payment')),
-              refId: p.transactionReference || 'UTR-PENDING',
-              date: formatDateTime(p.createdAt),
-              status: 'pending',
+              verifiedAmount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
+              type: isCash ? 'cash' : 'online',
+              method: isCash ? 'Cash Payment' : 'UPI / Online',
+              refId: p.transactionReference || (isCash ? 'Cash Verified' : 'UTR-VERIFIED'),
+              date: formatDateTime(p.verifiedAt || p.createdAt),
+              status: 'verified',
+              adminRemark: isCash ? 'Cash verified and allocated' : 'Online payment verified',
               screenshotUrl: p.screenshotUrl || null,
               originalData: p,
-            }))
-          : [];
-
-      const verifiedItems =
-        verifiedRes.status === 'fulfilled' && Array.isArray(verifiedRes.value)
-          ? verifiedRes.value.map((p) => {
-              const isCash = p.method === 'CASH';
-              return {
-                id: `verified_${p.id}`,
-                backendId: p.id,
-                roomId: p.roomId,
-                room: p.roomNumber || (p.roomId ? String(p.roomId) : 'Unknown'),
-                resident: `Room ${p.roomNumber || ''} Resident`,
-                amount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
-                rawAmount: Number(p.amount || 0),
-                verifiedAmount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
-                type: isCash ? 'cash' : 'online',
-                method: isCash ? 'Cash Payment' : 'UPI / Online',
-                refId: p.transactionReference || (isCash ? 'Cash Verified' : 'UTR-VERIFIED'),
-                date: formatDateTime(p.verifiedAt || p.createdAt),
-                status: 'verified',
-                adminRemark: isCash ? 'Cash verified and allocated' : 'Online payment verified',
-                screenshotUrl: p.screenshotUrl || null,
-                originalData: p,
-              };
-            })
+            };
+          })
           : [];
 
       if (cashRes.status === 'rejected' && onlineRes.status === 'rejected' && verifiedRes.status === 'rejected') {
@@ -601,8 +601,7 @@ export default function AdminDashboardScreen({
             console.warn('Payment verified but allocation failed:', allocErr?.message || allocErr);
             Alert.alert(
               'Payment Verified (Allocation Notice)',
-              `The payment was verified successfully, but maintenance allocation returned: ${
-                allocErr?.response?.data?.message || allocErr?.message || 'Check room dues'
+              `The payment was verified successfully, but maintenance allocation returned: ${allocErr?.response?.data?.message || allocErr?.message || 'Check room dues'
               }`
             );
           }
@@ -640,8 +639,7 @@ export default function AdminDashboardScreen({
 
       Alert.alert(
         'Payment Verified & Approved',
-        `Successfully approved ${formattedAmount} for Room ${targetRoom}.${
-          isCustom ? ` (Original declared: ${origAmount})` : ''
+        `Successfully approved ${formattedAmount} for Room ${targetRoom}.${isCustom ? ` (Original declared: ${origAmount})` : ''
         }`
       );
     } catch (err) {
