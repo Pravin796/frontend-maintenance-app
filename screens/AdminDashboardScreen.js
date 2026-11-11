@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   RefreshControl,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -48,6 +49,149 @@ import {
 } from '../src/services/adminService';
 
 const TAB_ORDER = ['dashboard', 'payments', 'rooms', 'profile'];
+
+function ProofImageViewer({ uri }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+  }, [uri]);
+
+  if (!uri) {
+    return (
+      <View
+        style={{
+          width: '100%',
+          height: 200,
+          borderRadius: 14,
+          backgroundColor: '#F8FAFC',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: '#E2E8F0',
+        }}
+      >
+        <Ionicons name="image-outline" size={48} color="#94A3B8" />
+        <Text style={{ fontSize: 13, color: '#64748B', marginTop: 8 }}>
+          No image screenshot provided
+        </Text>
+      </View>
+    );
+  }
+
+  const handleOpenFullImage = () => {
+    if (uri && (uri.startsWith('http://') || uri.startsWith('https://'))) {
+      Linking.openURL(uri).catch((err) => {
+        console.warn('Could not open proof image URL:', err);
+      });
+    }
+  };
+
+  return (
+    <View
+      style={{
+        width: '100%',
+        height: 290,
+        borderRadius: 14,
+        overflow: 'hidden',
+        backgroundColor: '#F8FAFC',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        position: 'relative',
+      }}
+    >
+      {/* Loading Overlay */}
+      {loading && !error && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 2,
+            backgroundColor: '#F8FAFC',
+          }}
+        >
+          <ActivityIndicator size="large" color="#F57C00" />
+          <Text style={{ marginTop: 12, fontSize: 13, color: '#64748B', fontWeight: '600' }}>
+            Loading proof image...
+          </Text>
+        </View>
+      )}
+
+      {/* Error Fallback */}
+      {error ? (
+        <View style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Ionicons name="alert-circle-outline" size={44} color="#EF4444" />
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#991B1B', marginTop: 8 }}>
+            Failed to load receipt image
+          </Text>
+          <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 12 }}>
+            The receipt image could not be loaded from storage.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+            <TouchableOpacity
+              onPress={() => {
+                setError(false);
+                setLoading(true);
+              }}
+              activeOpacity={0.7}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                backgroundColor: '#FEF2F2',
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#FEE2E2',
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Retry</Text>
+            </TouchableOpacity>
+            {uri.startsWith('http') && (
+              <TouchableOpacity
+                onPress={handleOpenFullImage}
+                activeOpacity={0.7}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  backgroundColor: '#EFF6FF',
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#DBEAFE',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>Open Link</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      ) : (
+        <Image
+          source={{ uri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain"
+          onLoadStart={() => {
+            setLoading(true);
+            setError(false);
+          }}
+          onLoad={() => setLoading(false)}
+          onLoadEnd={() => setLoading(false)}
+          onError={() => {
+            setLoading(false);
+            setError(true);
+          }}
+        />
+      )}
+    </View>
+  );
+}
 
 export default function AdminDashboardScreen({
   navigation,
@@ -3069,37 +3213,8 @@ export default function AdminDashboardScreen({
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 10 }}>
-              {viewingProof?.screenshotUrl ? (
-                <Image
-                  source={{ uri: viewingProof.screenshotUrl }}
-                  style={{
-                    width: '100%',
-                    height: 280,
-                    borderRadius: 14,
-                    backgroundColor: '#F1F5F9',
-                  }}
-                  resizeMode="contain"
-                />
-              ) : (
-                <View
-                  style={{
-                    width: '100%',
-                    height: 180,
-                    borderRadius: 14,
-                    backgroundColor: '#F8FAFC',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                  }}
-                >
-                  <Ionicons name="image-outline" size={48} color="#94A3B8" />
-                  <Text style={{ fontSize: 13, color: '#64748B', marginTop: 8 }}>
-                    No image screenshot provided
-                  </Text>
-                </View>
-              )}
+            <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 10, width: '100%' }}>
+              <ProofImageViewer uri={viewingProof?.screenshotUrl} />
 
               <View
                 style={{
@@ -3121,23 +3236,46 @@ export default function AdminDashboardScreen({
                     {viewingProof?.refId || 'N/A'}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => handleCopyRef(viewingProof?.refId)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingHorizontal: 8,
-                    paddingVertical: 5,
-                    borderRadius: 8,
-                    backgroundColor: '#FFFFFF',
-                    borderWidth: 1,
-                    borderColor: '#CBD5E1',
-                    gap: 4,
-                  }}
-                >
-                  <Ionicons name="copy-outline" size={13} color="#475569" />
-                  <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569' }}>Copy</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {viewingProof?.screenshotUrl && (viewingProof.screenshotUrl.startsWith('http://') || viewingProof.screenshotUrl.startsWith('https://')) && (
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(viewingProof.screenshotUrl).catch((err) => console.warn(err))}
+                      activeOpacity={0.7}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 8,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        backgroundColor: '#EFF6FF',
+                        borderWidth: 1,
+                        borderColor: '#BFDBFE',
+                        gap: 4,
+                      }}
+                    >
+                      <Ionicons name="open-outline" size={13} color="#2563EB" />
+                      <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#1D4ED8' }}>Full</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => handleCopyRef(viewingProof?.refId)}
+                    activeOpacity={0.7}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 8,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                      backgroundColor: '#FFFFFF',
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      gap: 4,
+                    }}
+                  >
+                    <Ionicons name="copy-outline" size={13} color="#475569" />
+                    <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569' }}>Copy</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </ScrollView>
 
