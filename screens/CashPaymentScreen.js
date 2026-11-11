@@ -1,4 +1,4 @@
-﻿import React, { useState, memo } from 'react';
+import React, { useState, memo } from 'react';
 import {
   View,
   Text,
@@ -73,12 +73,21 @@ export default function CashPaymentScreen({
   defaultAmount = '1000',
   onSubmitCashPayment,
   onBack,
+  isPaymentLocked = false,
 }) {
   const roomNumber = user?.roomNumber || '104';
   const [amount, setAmount] = useState(defaultAmount);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    if (isPaymentLocked) {
+      Alert.alert(
+        'Payment Under Verification',
+        'Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.'
+      );
+      return;
+    }
+
     const trimmed = amount.trim();
     if (!trimmed || isNaN(trimmed) || Number(trimmed) <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid cash payment amount.');
@@ -136,6 +145,27 @@ export default function CashPaymentScreen({
       }}
       showsVerticalScrollIndicator={false}
     >
+      {/* Verification Lock Banner */}
+      {isPaymentLocked && (
+        <View
+          style={{
+            backgroundColor: '#FFFBEB',
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 16,
+            borderWidth: 1.5,
+            borderColor: '#FDE68A',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <Ionicons name="alert-circle" size={22} color="#D97706" />
+          <Text style={{ flex: 1, fontSize: 13, color: '#92400E', lineHeight: 18 }}>
+            Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.
+          </Text>
+        </View>
+      )}
       {/* Top Back Navigation Button */}
       {onBack && (
         <TouchableOpacity
@@ -299,12 +329,13 @@ export default function CashPaymentScreen({
               value={amount}
               onChangeText={setAmount}
               keyboardType="numeric"
+              editable={!isPaymentLocked}
               style={{
                 flex: 1,
                 paddingVertical: 12,
                 fontSize: 14,
                 fontWeight: '600',
-                color: '#0F172A',
+                color: isPaymentLocked ? '#94A3B8' : '#0F172A',
               }}
             />
           </View>
@@ -346,20 +377,20 @@ export default function CashPaymentScreen({
         {/* Submit Cash Payment Button */}
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isPaymentLocked}
           activeOpacity={0.85}
           style={{
-            backgroundColor: '#F57C00',
+            backgroundColor: isPaymentLocked ? '#CBD5E1' : '#F57C00',
             borderRadius: 14,
             paddingVertical: 14,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            shadowColor: '#F57C00',
+            shadowColor: isPaymentLocked ? 'transparent' : '#F57C00',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.28,
+            shadowOpacity: isPaymentLocked ? 0 : 0.28,
             shadowRadius: 8,
-            elevation: 3,
+            elevation: isPaymentLocked ? 0 : 3,
           }}
         >
           {isSubmitting ? (

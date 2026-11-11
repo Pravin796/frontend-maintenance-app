@@ -158,15 +158,39 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
 
 
 
+  const isPaymentLocked = Boolean(dashboardData?.pendingPayment);
+
   const handleOpenOnlinePayment = useCallback(() => {
+    if (dashboardData?.pendingPayment) {
+      Alert.alert(
+        'Payment Under Verification',
+        'Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.'
+      );
+      return;
+    }
+    if (outstandingBalance <= 0) {
+      Alert.alert('No Dues', 'All maintenance dues are cleared. There are no outstanding dues to pay.');
+      return;
+    }
     setActiveTab('payments');
     setPaymentSubView('online');
-  }, []);
+  }, [dashboardData?.pendingPayment, outstandingBalance]);
 
   const handleOpenCashPayment = useCallback(() => {
+    if (dashboardData?.pendingPayment) {
+      Alert.alert(
+        'Payment Under Verification',
+        'Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.'
+      );
+      return;
+    }
+    if (outstandingBalance <= 0) {
+      Alert.alert('No Dues', 'All maintenance dues are cleared. There are no outstanding dues to pay.');
+      return;
+    }
     setActiveTab('payments');
     setPaymentSubView('cash');
-  }, []);
+  }, [dashboardData?.pendingPayment, outstandingBalance]);
 
   const handleBackToMainPayments = useCallback(() => {
     setPaymentSubView('main');
@@ -190,11 +214,12 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
 
       if (nextTab === 'payments') {
         setPaymentSubView('main');
+        fetchDashboardData(true);
       }
 
       setActiveTab(nextTab);
     },
-    [tabScaleAnims]
+    [tabScaleAnims, fetchDashboardData]
   );
 
   return (
@@ -790,6 +815,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   }
                   upiId="pravin@example@okaxis"
                   recipientName="Residency Maintenance"
+                  isPaymentLocked={isPaymentLocked}
                   onBack={handleBackToMainPayments}
                   onSubmitVerification={() => {
                     handleBackToMainPayments();
@@ -810,6 +836,7 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   }}
                   outstandingAmount={formatCurrency(outstandingBalance)}
                   defaultAmount={String(outstandingBalance > 0 ? outstandingBalance : maintenanceRate)}
+                  isPaymentLocked={isPaymentLocked}
                   onBack={handleBackToMainPayments}
                   onSubmitCashPayment={() => {
                     handleBackToMainPayments();

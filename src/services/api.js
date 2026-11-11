@@ -304,6 +304,11 @@ export const createCashPaymentRequest = async ({ amount, roomId }) => {
   return response.data;
 };
 
+export const getMyCashRequests = async () => {
+  const response = await api.get('/cash-payments/my');
+  return response.data;
+};
+
 export const userApi = {
   getUserDashboard,
   getMyPayments,
@@ -313,6 +318,7 @@ export const userApi = {
   updatePaymentProof,
   submitPaymentProof,
   createCashPaymentRequest,
+  getMyCashRequests,
 };
 
 /**

@@ -517,6 +517,31 @@ export default function AdminDashboardScreen({
 
     const isCash = verifyModalItem.type === 'cash';
 
+    if (selectedMaintenanceId) {
+      const selectedRec = roomMaintenanceRecords.find((r) => r.id === selectedMaintenanceId);
+      if (selectedRec) {
+        const remaining = Number(
+          selectedRec.remainingBalance ??
+          selectedRec.remainingAmount ??
+          (selectedRec.status === 'PAID' ? 0 : (selectedRec.totalAmount ?? selectedRec.amount ?? 0))
+        );
+        if (remaining <= 0 || selectedRec.status === 'PAID') {
+          Alert.alert(
+            'Bill Already Cleared',
+            'The selected maintenance record is already fully cleared. Please choose an unpaid maintenance record, generate a new bill, or reject the payment if it is a duplicate.'
+          );
+          return;
+        }
+        if (approvedNum > remaining) {
+          Alert.alert(
+            'Allocation Exceeds Due Balance',
+            `The allocation amount (₹${approvedNum.toLocaleString('en-IN')}) exceeds the remaining unpaid balance for this bill (₹${remaining.toLocaleString('en-IN')}).`
+          );
+          return;
+        }
+      }
+    }
+
     if (isCash) {
       if (!selectedMaintenanceId) {
         Alert.alert(
@@ -531,28 +556,6 @@ export default function AdminDashboardScreen({
           `Under society rules, the verified cash allocation must match the declared request amount (₹${verifyModalItem.rawAmount.toLocaleString('en-IN')}).`
         );
         return;
-      }
-      const selectedRec = roomMaintenanceRecords.find((r) => r.id === selectedMaintenanceId);
-      if (selectedRec) {
-        const remaining = Number(
-          selectedRec.remainingBalance ??
-          selectedRec.remainingAmount ??
-          (selectedRec.status === 'PAID' ? 0 : (selectedRec.totalAmount ?? selectedRec.amount ?? 0))
-        );
-        if (remaining <= 0 || selectedRec.status === 'PAID') {
-          Alert.alert(
-            'Bill Already Cleared',
-            'The selected maintenance record is already fully cleared. Please choose an unpaid maintenance record or generate a new bill.'
-          );
-          return;
-        }
-        if (approvedNum > remaining) {
-          Alert.alert(
-            'Allocation Exceeds Due Balance',
-            `The allocation amount (₹${approvedNum.toLocaleString('en-IN')}) exceeds the remaining unpaid balance for this bill (₹${remaining.toLocaleString('en-IN')}).`
-          );
-          return;
-        }
       }
     }
 
@@ -687,10 +690,18 @@ export default function AdminDashboardScreen({
   };
 
   const filteredPayments = payments.filter((p) => {
-    if (paymentFilter === 'online') return p.type === 'online' && p.status === 'pending';
-    if (paymentFilter === 'cash') return p.type === 'cash' && p.status === 'pending';
-    if (paymentFilter === 'verified') return p.status === 'verified';
-    return p.status === 'pending';
+    const pType = String(p.type || '').toLowerCase();
+    const pStatus = String(p.status || '').toLowerCase();
+    if (paymentFilter === 'online') {
+      return pType === 'online' && pStatus === 'pending';
+    }
+    if (paymentFilter === 'cash') {
+      return pType === 'cash' && pStatus === 'pending';
+    }
+    if (paymentFilter === 'verified') {
+      return pStatus === 'verified';
+    }
+    return pStatus === 'pending';
   });
 
   const handleCopyPassword = async () => {
@@ -1204,10 +1215,9 @@ export default function AdminDashboardScreen({
               {/* Filter Pills */}
               <ScrollView
                 horizontal
-                nestedScrollEnabled={true}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 8, marginBottom: 18 }}
+                contentContainerStyle={{ gap: 8, marginBottom: 18, paddingVertical: 2 }}
               >
                 {[
                   { key: 'all', label: `Pending (${totalPendingCount})` },
@@ -1221,7 +1231,6 @@ export default function AdminDashboardScreen({
                       key={filter.key}
                       onPress={() => setPaymentFilter(filter.key)}
                       activeOpacity={0.7}
-                      hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                       style={{
                         paddingHorizontal: 16,
                         paddingVertical: 9,
@@ -1319,7 +1328,13 @@ export default function AdminDashboardScreen({
                     All caught up!
                   </Text>
                   <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>
-                    No payments in this category.
+                    {paymentFilter === 'verified'
+                      ? 'No verified payment records found.'
+                      : paymentFilter === 'online'
+                      ? 'No pending online payments.'
+                      : paymentFilter === 'cash'
+                      ? 'No pending cash payment requests.'
+                      : 'No payments in this category.'}
                   </Text>
                 </View>
               ) : (

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,12 @@ export default function PaymentScreen({
 }) {
   const userName = dashboardData?.residentName || user?.fullName || 'Pravin Kumar';
   const roomNumber = dashboardData?.roomNumber || user?.roomNumber || '104';
+
+  const outstandingNum = dashboardData?.outstandingBalance != null
+    ? Number(dashboardData.outstandingBalance)
+    : null;
+  const isPaymentLocked = Boolean(dashboardData?.pendingPayment);
+  const isDuesCleared = !isPaymentLocked && outstandingNum != null && outstandingNum <= 0;
 
   const outstandingDisplay = dashboardData?.outstandingBalance != null
     ? `₹${Number(dashboardData.outstandingBalance).toLocaleString('en-IN')}`
@@ -201,14 +207,126 @@ export default function PaymentScreen({
         />
       )}
 
+      {/* Prominent Verification Lock Card when a payment awaits admin review */}
+      {isPaymentLocked && (
+        <View
+          style={{
+            backgroundColor: '#FFFBEB',
+            borderRadius: 18,
+            padding: 16,
+            marginBottom: 16,
+            borderWidth: 1.5,
+            borderColor: '#FDE68A',
+            shadowColor: '#D97706',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+            elevation: 2,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Ionicons name="time" size={20} color="#D97706" />
+            <Text style={{ fontSize: 15, fontWeight: '800', color: '#92400E' }}>
+              Payment Verification In Progress
+            </Text>
+          </View>
+          <Text style={{ fontSize: 13, color: '#78350F', lineHeight: 18, marginBottom: 12 }}>
+            Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.
+          </Text>
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 12,
+              padding: 12,
+              borderWidth: 1,
+              borderColor: '#FEF3C7',
+              gap: 8,
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: '#92400E' }}>Payment Method</Text>
+              <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#78350F' }}>
+                {dashboardData.pendingPayment.method === 'CASH' ? 'Cash Handover' : 'Online UPI'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: '#92400E' }}>Amount Submitted</Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#D97706' }}>
+                ₹{Number(dashboardData.pendingPayment.amount || 0).toLocaleString('en-IN')}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: '#92400E' }}>Submission Date</Text>
+              <Text style={{ fontSize: 12, color: '#78350F' }}>
+                {formatPaymentDate(dashboardData.pendingPayment.createdAt) || 'Recent'}
+              </Text>
+            </View>
+            {dashboardData.pendingPayment.transactionReference ? (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, color: '#92400E' }}>Reference / UTR</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#78350F' }}>
+                  {dashboardData.pendingPayment.transactionReference}
+                </Text>
+              </View>
+            ) : null}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: '#92400E' }}>Status</Text>
+              <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309' }}>
+                  AWAITING VERIFICATION
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Dues Cleared Banner (if not locked and balance is 0) */}
+      {!isPaymentLocked && isDuesCleared && (
+        <View
+          style={{
+            backgroundColor: '#F0FDF4',
+            borderRadius: 18,
+            padding: 16,
+            marginBottom: 16,
+            borderWidth: 1.5,
+            borderColor: '#DCFCE7',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14.5, fontWeight: '800', color: '#166534' }}>
+              All Dues Cleared
+            </Text>
+            <Text style={{ fontSize: 12.5, color: '#15803D', marginTop: 2 }}>
+              There are no outstanding dues. Your maintenance account is up to date.
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Hero Current Maintenance Due Card */}
       <HeroGradientCard
         variant="due"
         title="Current Maintenance Due"
-        amount={dueDisplay}
-        dueText={`Due for ${dueBillingMonth}`}
-        buttonText="Pay Now"
+        amount={isDuesCleared ? '₹0' : dueDisplay}
+        dueText={isPaymentLocked ? 'Verification in progress' : isDuesCleared ? 'All dues cleared' : `Due for ${dueBillingMonth}`}
+        buttonText={isPaymentLocked ? 'Under Review' : isDuesCleared ? 'All Paid' : 'Pay Now'}
         onPayPress={() => {
+          if (isPaymentLocked) {
+            Alert.alert(
+              'Payment Under Verification',
+              'Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.'
+            );
+            return;
+          }
+          if (isDuesCleared) {
+            Alert.alert('No Dues', 'All maintenance dues are cleared. There are no outstanding dues to pay.');
+            return;
+          }
           if (onNavigateOnlinePayment) {
             onNavigateOnlinePayment();
           } else {
@@ -259,7 +377,7 @@ export default function PaymentScreen({
         Quick Actions
       </Text>
 
-      {/* 3 Quick Action Tiles in a Row */}
+      {/* Quick Action Tiles in a Row */}
       <View
         style={{
           flexDirection: 'row',
@@ -271,10 +389,22 @@ export default function PaymentScreen({
         <QuickActionTile
           title={'Online Payment'}
           iconName="qr-code-outline"
-          iconColor="#D97706"
-          iconBgColor="#FEF3C7"
-          arrowColor="#D97706"
+          iconColor={isPaymentLocked || isDuesCleared ? '#94A3B8' : '#D97706'}
+          iconBgColor={isPaymentLocked || isDuesCleared ? '#F1F5F9' : '#FEF3C7'}
+          arrowColor={isPaymentLocked || isDuesCleared ? '#94A3B8' : '#D97706'}
+          style={isPaymentLocked || isDuesCleared ? { opacity: 0.55 } : undefined}
           onPress={() => {
+            if (isPaymentLocked) {
+              Alert.alert(
+                'Payment Under Verification',
+                'Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.'
+              );
+              return;
+            }
+            if (isDuesCleared) {
+              Alert.alert('No Dues', 'All maintenance dues are cleared. There are no outstanding dues to pay.');
+              return;
+            }
             if (onNavigateOnlinePayment) {
               onNavigateOnlinePayment();
             } else {
@@ -287,10 +417,22 @@ export default function PaymentScreen({
         <QuickActionTile
           title={'Cash Payment'}
           iconName="cash-outline"
-          iconColor="#EA580C"
-          iconBgColor="#FFF3E8"
-          arrowColor="#EA580C"
+          iconColor={isPaymentLocked || isDuesCleared ? '#94A3B8' : '#EA580C'}
+          iconBgColor={isPaymentLocked || isDuesCleared ? '#F1F5F9' : '#FFF3E8'}
+          arrowColor={isPaymentLocked || isDuesCleared ? '#94A3B8' : '#EA580C'}
+          style={isPaymentLocked || isDuesCleared ? { opacity: 0.55 } : undefined}
           onPress={() => {
+            if (isPaymentLocked) {
+              Alert.alert(
+                'Payment Under Verification',
+                'Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.'
+              );
+              return;
+            }
+            if (isDuesCleared) {
+              Alert.alert('No Dues', 'All maintenance dues are cleared. There are no outstanding dues to pay.');
+              return;
+            }
             if (onNavigateCashPayment) {
               onNavigateCashPayment();
             } else {

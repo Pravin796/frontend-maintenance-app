@@ -129,6 +129,7 @@ export default function OnlinePaymentScreen({
   recipientName = 'Residency Maintenance',
   onSubmitVerification,
   onBack,
+  isPaymentLocked = false,
 }) {
   const roomNumber = user?.roomNumber || '101';
 
@@ -187,6 +188,14 @@ export default function OnlinePaymentScreen({
   // Submit for verification in a single multipart request (UTR + screenshot)
   const handleSubmit = async () => {
     if (isSubmitting) return;
+
+    if (isPaymentLocked) {
+      Alert.alert(
+        'Payment Under Verification',
+        'Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.'
+      );
+      return;
+    }
 
     const trimmed = utrNumber.trim();
     if (!trimmed) {
@@ -275,7 +284,7 @@ export default function OnlinePaymentScreen({
     }
   };
 
-  const isSubmitDisabled = isSubmitting || !utrNumber.trim() || !localImageUri;
+  const isSubmitDisabled = isSubmitting || !utrNumber.trim() || !localImageUri || isPaymentLocked;
 
   return (
     <ScrollView
@@ -286,6 +295,27 @@ export default function OnlinePaymentScreen({
       }}
       showsVerticalScrollIndicator={false}
     >
+      {/* Verification Lock Banner */}
+      {isPaymentLocked && (
+        <View
+          style={{
+            backgroundColor: '#FFFBEB',
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 16,
+            borderWidth: 1.5,
+            borderColor: '#FDE68A',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <Ionicons name="alert-circle" size={22} color="#D97706" />
+          <Text style={{ flex: 1, fontSize: 13, color: '#92400E', lineHeight: 18 }}>
+            Your payment has been submitted successfully and is awaiting admin verification. You cannot make another payment until the administrator reviews your current payment.
+          </Text>
+        </View>
+      )}
       {/* Top Back Navigation Button */}
       {onBack && (
         <TouchableOpacity
