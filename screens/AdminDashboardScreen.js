@@ -32,10 +32,14 @@ import {
 import {
   getAdminDashboard,
   getPendingCashRequests,
+  getAllCashRequestsAdmin,
+  getAllRejectedCashRequests,
   verifyCashRequest,
   rejectCashRequest,
   getPendingOnlinePayments,
   getVerifiedPayments,
+  getAllPaymentsAdmin,
+  getAllRejectedPayments,
   verifyOnlinePayment,
   rejectOnlinePayment,
   createPaymentAllocation,
@@ -230,9 +234,8 @@ export default function AdminDashboardScreen({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dashboardError, setDashboardError] = useState(null);
 
-  // Live pending payments state
-  const [pendingPayments, setPendingPayments] = useState([]);
-  const [verifiedHistory, setVerifiedHistory] = useState([]);
+  // Live payments state (unique row per submission, stable IDs)
+  const [paymentsList, setPaymentsList] = useState([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
   const [isRefreshingPayments, setIsRefreshingPayments] = useState(false);
   const [paymentsError, setPaymentsError] = useState(null);
@@ -327,88 +330,81 @@ export default function AdminDashboardScreen({
     }
     setPaymentsError(null);
     try {
-      const [cashRes, onlineRes, verifiedRes] = await Promise.allSettled([
-        getPendingCashRequests(),
-        getPendingOnlinePayments(),
-        getVerifiedPayments(),
+      const [cashRes, paymentsRes] = await Promise.allSettled([
+        getAllCashRequestsAdmin(),
+        getAllPaymentsAdmin(),
       ]);
 
       const cashItems =
         cashRes.status === 'fulfilled' && Array.isArray(cashRes.value)
-          ? cashRes.value.map((c) => ({
-            id: `cash_${c.id}`,
-            backendId: c.id,
-            roomId: c.roomId,
-            room: c.roomNumber || (c.roomId ? String(c.roomId) : 'Unknown'),
-            resident: c.residentName || `Room ${c.roomNumber || ''} Resident`,
-            amount: `₹${Number(c.amount || 0).toLocaleString('en-IN')}`,
-            rawAmount: Number(c.amount || 0),
-            type: 'cash',
-            method: 'Cash Payment',
-            refId: c.residentNote || 'Cash handover at desk',
-            date: formatDateTime(c.createdAt),
-            status: 'pending',
-            screenshotUrl: null,
-            originalData: c,
-          }))
-          : [];
-
-      const onlineItems =
-        onlineRes.status === 'fulfilled' && Array.isArray(onlineRes.value)
-          ? onlineRes.value.map((p) => ({
-            id: `online_${p.id}`,
-            backendId: p.id,
-            roomId: p.roomId,
-            room: p.roomNumber || (p.roomId ? String(p.roomId) : 'Unknown'),
-            resident: `Room ${p.roomNumber || ''} Resident`,
-            amount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
-            rawAmount: Number(p.amount || 0),
-            type: 'online',
-            method: p.method === 'CASH' ? 'Cash Payment' : (p.paymentMode === 'ONLINE' ? 'UPI / Online' : (p.paymentMode || 'Online Payment')),
-            refId: p.transactionReference || 'UTR-PENDING',
-            date: formatDateTime(p.createdAt),
-            status: 'pending',
-            screenshotUrl: p.screenshotUrl || null,
-            originalData: p,
-          }))
-          : [];
-
-      const verifiedItems =
-        verifiedRes.status === 'fulfilled' && Array.isArray(verifiedRes.value)
-          ? verifiedRes.value.map((p) => {
-            const isCash = p.method === 'CASH';
+          ? cashRes.value.map((c) => {
+            const cStatus = String(c.status || 'PENDING').toLowerCase();
             return {
-              id: `verified_${p.id}`,
-              backendId: p.id,
-              roomId: p.roomId,
-              room: p.roomNumber || (p.roomId ? String(p.roomId) : 'Unknown'),
-              resident: `Room ${p.roomNumber || ''} Resident`,
-              amount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
-              rawAmount: Number(p.amount || 0),
-              verifiedAmount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
-              type: isCash ? 'cash' : 'online',
-              method: isCash ? 'Cash Payment' : 'UPI / Online',
-              refId: p.transactionReference || (isCash ? 'Cash Verified' : 'UTR-VERIFIED'),
-              date: formatDateTime(p.verifiedAt || p.createdAt),
-              status: 'verified',
-              adminRemark: isCash ? 'Cash verified and allocated' : 'Online payment verified',
-              screenshotUrl: p.screenshotUrl || null,
-              originalData: p,
+              id: `cash-${c.id}`,
+              backendId: c.id,
+              roomId: c.roomId,
+              room: c.roomNumber || (c.roomId ? String(c.roomId) : 'Unknown'),
+              resident: c.residentName || (c.roomNumber ? `Room ${c.roomNumber} Resident` : 'Unknown Resident'),
+              amount: `₹${Number(c.amount || 0).toLocaleString('en-IN')}`,
+              rawAmount: Number(c.amount || 0),
+              verifiedAmount: cStatus === 'verified' ? `₹${Number(c.amount || 0).toLocaleString('en-IN')}` : null,
+              type: 'cash',
+              method: 'Cash Payment',
+              refId: c.residentNote || 'Cash handover at desk',
+              date: formatDateTime(c.verifiedAt || c.createdAt),
+              rawDate: c.verifiedAt || c.createdAt,
+              status: cStatus,
+              adminRemark: c.adminNote || (cStatus === 'verified' ? 'Cash verified and allocated' : cStatus === 'rejected' ? 'Cash request rejected' : null),
+              screenshotUrl: null,
+              originalData: c,
             };
           })
           : [];
 
-      if (cashRes.status === 'rejected' && onlineRes.status === 'rejected' && verifiedRes.status === 'rejected') {
-        const err = cashRes.reason || onlineRes.reason || verifiedRes.reason;
+      const onlineItems =
+        paymentsRes.status === 'fulfilled' && Array.isArray(paymentsRes.value)
+          ? paymentsRes.value
+            .filter((p) => p.method !== 'CASH')
+            .map((p) => {
+              const pStatus = String(p.status || 'PENDING').toLowerCase();
+              return {
+                id: `pay-${p.id}`,
+                backendId: p.id,
+                roomId: p.roomId,
+                room: p.roomNumber || (p.roomId ? String(p.roomId) : 'Unknown'),
+                resident: p.residentName || (p.roomNumber ? `Room ${p.roomNumber} Resident` : 'Unknown Resident'),
+                amount: `₹${Number(p.amount || 0).toLocaleString('en-IN')}`,
+                rawAmount: Number(p.amount || 0),
+                verifiedAmount: pStatus === 'verified' ? `₹${Number(p.amount || 0).toLocaleString('en-IN')}` : null,
+                type: 'online',
+                method: p.paymentMode === 'ONLINE' ? 'UPI / Online' : (p.paymentMode || 'Online Payment'),
+                refId: p.transactionReference || 'UTR-PENDING',
+                date: formatDateTime(p.verifiedAt || p.createdAt),
+                rawDate: p.verifiedAt || p.createdAt,
+                status: pStatus,
+                adminRemark: pStatus === 'verified' ? 'Online payment verified' : pStatus === 'rejected' ? 'Payment rejected by Admin' : null,
+                screenshotUrl: p.screenshotUrl || null,
+                originalData: p,
+              };
+            })
+          : [];
+
+      if (cashRes.status === 'rejected' && paymentsRes.status === 'rejected') {
+        const err = cashRes.reason || paymentsRes.reason;
         throw err;
       }
 
-      setPendingPayments([...cashItems, ...onlineItems]);
-      setVerifiedHistory(verifiedItems);
+      const allItems = [...cashItems, ...onlineItems].sort((a, b) => {
+        const timeA = new Date(a.rawDate || 0).getTime();
+        const timeB = new Date(b.rawDate || 0).getTime();
+        return timeB - timeA;
+      });
+
+      setPaymentsList(allItems);
     } catch (err) {
-      console.warn('Failed to load pending payments:', err?.message || err);
+      console.warn('Failed to load payments:', err?.message || err);
       if (err?.response?.status === 403) {
-        setPaymentsError('Admin permissions required to view pending payments.');
+        setPaymentsError('Admin permissions required to view payments.');
       } else {
         setPaymentsError(
           err?.response?.data?.message || err?.message || 'Unable to connect to payments server'
@@ -508,7 +504,9 @@ export default function AdminDashboardScreen({
   }
 
   // Combined live payments state
-  const payments = [...pendingPayments, ...verifiedHistory];
+  const payments = paymentsList;
+  const pendingPayments = paymentsList.filter((p) => p.status === 'pending');
+  const verifiedHistory = paymentsList.filter((p) => p.status === 'verified');
 
   // Mock rooms as dynamic state
   const [rooms, setRooms] = useState([
@@ -547,12 +545,14 @@ export default function AdminDashboardScreen({
   const heroRemainingStr = formatCurrency(backendOutstandingNum);
   const totalPendingDuesStr = formatCurrency(backendOutstandingNum);
 
-  const onlinePendingCount = pendingPayments.filter((p) => p.type === 'online').length;
-  const cashPendingCount = pendingPayments.filter((p) => p.type === 'cash').length;
-  const totalPendingCount = pendingPayments.length;
-  const verifiedCount = verifiedHistory.length > 0
-    ? verifiedHistory.length
-    : (dashboardData?.verifiedCashPayments != null ? Number(dashboardData.verifiedCashPayments) : 0);
+  const allCount = payments.length;
+  const onlineCount = payments.filter((p) => p.type === 'online').length;
+  const cashCount = payments.filter((p) => p.type === 'cash').length;
+  const onlinePendingCount = payments.filter((p) => p.type === 'online' && p.status === 'pending').length;
+  const cashPendingCount = payments.filter((p) => p.type === 'cash' && p.status === 'pending').length;
+  const totalPendingCount = payments.filter((p) => p.status === 'pending').length;
+  const verifiedCount = payments.filter((p) => p.status === 'verified').length;
+  const rejectedCount = payments.filter((p) => p.status === 'rejected' || p.status === 'failed').length;
 
   const handleLogoutConfirm = () => {
     confirmAction('Logout', 'Are you sure you want to log out of Admin Dashboard?', onLogout, 'Logout');
@@ -757,8 +757,24 @@ export default function AdminDashboardScreen({
         verifiedDate: 'Today, Just now',
       };
 
-      setVerifiedHistory((prev) => [verifiedItem, ...prev]);
-      setPendingPayments((prev) => prev.filter((p) => p.id !== verifyModalItem.id));
+      setPaymentsList((prev) =>
+        prev.map((p) =>
+          p.id === verifyModalItem.id
+            ? {
+                ...p,
+                status: 'verified',
+                verifiedAmount: formattedAmount,
+                originalAmount: origAmount,
+                adminRemark:
+                  adminRemarks.trim() ||
+                  (isCustom
+                    ? `Approved custom amount of ${formattedAmount}`
+                    : 'Payment verified by Admin'),
+                date: 'Today, Just now',
+              }
+            : p
+        )
+      );
 
       setVerifyModalItem(null);
       setCustomAmount('');
@@ -810,7 +826,17 @@ export default function AdminDashboardScreen({
                 await rejectOnlinePayment(item.backendId);
               }
 
-              setPendingPayments((prev) => prev.filter((p) => p.id !== item.id));
+              setPaymentsList((prev) =>
+                prev.map((p) =>
+                  p.id === item.id
+                    ? {
+                        ...p,
+                        status: 'rejected',
+                        adminRemark: 'Rejected by Administrator',
+                      }
+                    : p
+                )
+              );
 
               fetchDashboardData(true);
               fetchPaymentsData(true);
@@ -836,16 +862,22 @@ export default function AdminDashboardScreen({
   const filteredPayments = payments.filter((p) => {
     const pType = String(p.type || '').toLowerCase();
     const pStatus = String(p.status || '').toLowerCase();
+    if (paymentFilter === 'pending') {
+      return pStatus === 'pending';
+    }
     if (paymentFilter === 'online') {
-      return pType === 'online' && pStatus === 'pending';
+      return pType === 'online';
     }
     if (paymentFilter === 'cash') {
-      return pType === 'cash' && pStatus === 'pending';
+      return pType === 'cash';
     }
     if (paymentFilter === 'verified') {
       return pStatus === 'verified';
     }
-    return pStatus === 'pending';
+    if (paymentFilter === 'rejected') {
+      return pStatus === 'rejected' || pStatus === 'failed';
+    }
+    return true; // 'all'
   });
 
   const handleCopyPassword = async () => {
@@ -1013,6 +1045,7 @@ export default function AdminDashboardScreen({
       status: r.status,
       resident: resident ? resident.name : (liveRooms.length === 0 ? r.resident : null),
       phone: resident ? resident.mobileNumber : (liveRooms.length === 0 ? r.phone : null),
+      profilePictureUrl: resident ? resident.profilePictureUrl : null,
       residentData: resident || null,
       isOccupied: !!resident || (liveRooms.length === 0 && !!r.resident),
       dues: r.dues || (r.maintenanceExempt ? 'Exempt' : '₹0'),
@@ -1364,10 +1397,12 @@ export default function AdminDashboardScreen({
                 contentContainerStyle={{ gap: 8, marginBottom: 18, paddingVertical: 2 }}
               >
                 {[
-                  { key: 'all', label: `Pending (${totalPendingCount})` },
-                  { key: 'online', label: `Online (${onlinePendingCount})` },
-                  { key: 'cash', label: `Cash (${cashPendingCount})` },
+                  { key: 'all', label: `All (${allCount})` },
+                  { key: 'pending', label: `Pending (${totalPendingCount})` },
+                  { key: 'online', label: `Online (${onlineCount})` },
+                  { key: 'cash', label: `Cash (${cashCount})` },
                   { key: 'verified', label: `Verified (${verifiedCount})` },
+                  { key: 'rejected', label: `Rejected (${rejectedCount})` },
                 ].map((filter) => {
                   const isActive = paymentFilter === filter.key;
                   return (
@@ -1399,7 +1434,7 @@ export default function AdminDashboardScreen({
               </ScrollView>
 
               {/* Payments Tab Error Banner */}
-              {paymentsError && pendingPayments.length === 0 && (
+              {paymentsError && payments.length === 0 && (
                 <View
                   style={{
                     backgroundColor: '#FEF2F2',
@@ -1431,7 +1466,7 @@ export default function AdminDashboardScreen({
               )}
 
               {/* Loading state indicator */}
-              {isLoadingPayments && pendingPayments.length === 0 && (
+              {isLoadingPayments && payments.length === 0 && (
                 <View
                   style={{
                     paddingVertical: 36,
@@ -1441,13 +1476,13 @@ export default function AdminDashboardScreen({
                 >
                   <ActivityIndicator size="large" color="#F57C00" />
                   <Text style={{ marginTop: 10, fontSize: 13.5, color: '#64748B', fontWeight: '600' }}>
-                    Loading pending payment reviews...
+                    Loading payments...
                   </Text>
                 </View>
               )}
 
               {/* Payment Items List */}
-              {filteredPayments.length === 0 && (!isLoadingPayments || pendingPayments.length > 0) ? (
+              {filteredPayments.length === 0 && (!isLoadingPayments || payments.length > 0) ? (
                 <View
                   style={{
                     backgroundColor: '#FFFFFF',
@@ -1474,10 +1509,14 @@ export default function AdminDashboardScreen({
                   <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>
                     {paymentFilter === 'verified'
                       ? 'No verified payment records found.'
+                      : paymentFilter === 'rejected'
+                      ? 'No rejected payment records found.'
                       : paymentFilter === 'online'
-                      ? 'No pending online payments.'
+                      ? 'No online payments found.'
                       : paymentFilter === 'cash'
-                      ? 'No pending cash payment requests.'
+                      ? 'No cash payment requests found.'
+                      : paymentFilter === 'pending'
+                      ? 'No pending payments awaiting review.'
                       : 'No payments in this category.'}
                   </Text>
                 </View>
@@ -1485,6 +1524,8 @@ export default function AdminDashboardScreen({
                 filteredPayments.map((p) => {
                   const isOnline = p.type === 'online';
                   const isPending = p.status === 'pending';
+                  const isVerified = p.status === 'verified';
+                  const isRejected = p.status === 'rejected' || p.status === 'failed';
                   const roomPendingMatches = pendingPayments.filter(
                     (item) => String(item.roomId) === String(p.roomId) || (item.room && String(item.room) === String(p.room))
                   );
@@ -1501,9 +1542,9 @@ export default function AdminDashboardScreen({
                         padding: 16,
                         marginBottom: 14,
                         borderWidth: 1,
-                        borderColor: isOnline ? '#E0E7FF' : '#FEF3C7',
+                        borderColor: isRejected ? '#FEE2E2' : isVerified ? '#DCFCE7' : isOnline ? '#E0E7FF' : '#FEF3C7',
                         borderLeftWidth: 5,
-                        borderLeftColor: isOnline ? '#3B82F6' : '#F59E0B',
+                        borderLeftColor: isRejected ? '#EF4444' : isVerified ? '#16A34A' : isOnline ? '#3B82F6' : '#F59E0B',
                         shadowColor: '#0F172A',
                         shadowOffset: { width: 0, height: 3 },
                         shadowOpacity: 0.04,
@@ -1615,6 +1656,37 @@ export default function AdminDashboardScreen({
                               </Text>
                             </View>
                           )}
+
+                          {/* Status Badge */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isRejected ? '#FEF2F2' : isVerified ? '#ECFDF5' : '#FFFBEB',
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: isRejected ? '#FEE2E2' : isVerified ? '#D1FAE5' : '#FDE68A',
+                              gap: 4,
+                            }}
+                          >
+                            <Ionicons
+                              name={isRejected ? 'close-circle' : isVerified ? 'checkmark-circle' : 'time'}
+                              size={12}
+                              color={isRejected ? '#DC2626' : isVerified ? '#059669' : '#D97706'}
+                            />
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: '700',
+                                color: isRejected ? '#DC2626' : isVerified ? '#059669' : '#B45309',
+                                textTransform: 'capitalize',
+                              }}
+                            >
+                              {p.status}
+                            </Text>
+                          </View>
                         </View>
 
                         {/* Right: Amount Display (No collision) */}
@@ -1629,13 +1701,13 @@ export default function AdminDashboardScreen({
                               marginBottom: 1,
                             }}
                           >
-                            {!isPending ? 'APPROVED' : isOnline ? 'REQUESTED' : 'DECLARED'}
+                            {isRejected ? 'REJECTED' : isVerified ? 'APPROVED' : isOnline ? 'REQUESTED' : 'DECLARED'}
                           </Text>
                           <Text
                             style={{
                               fontSize: 20,
                               fontWeight: '900',
-                              color: !isPending ? '#16A34A' : '#0F172A',
+                              color: isRejected ? '#DC2626' : isVerified ? '#16A34A' : '#0F172A',
                               letterSpacing: -0.4,
                             }}
                           >
@@ -1857,6 +1929,33 @@ export default function AdminDashboardScreen({
                             </Text>
                             <Ionicons name="create-outline" size={14} color="#FFEDD5" style={{ marginLeft: 2 }} />
                           </TouchableOpacity>
+                        </View>
+                      ) : isRejected ? (
+                        <View
+                          style={{
+                            backgroundColor: '#FEF2F2',
+                            borderRadius: 12,
+                            padding: 12,
+                            borderWidth: 1,
+                            borderColor: '#FEE2E2',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Ionicons name="close-circle" size={18} color="#DC2626" />
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#B91C1C' }}>
+                                Payment Rejected
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: '#DC2626' }}>
+                              {p.amount}
+                            </Text>
+                          </View>
+                          {p.adminRemark ? (
+                            <Text style={{ fontSize: 11.5, color: '#991B1B', marginTop: 3 }}>
+                              Note: {p.adminRemark}
+                            </Text>
+                          ) : null}
                         </View>
                       ) : (
                         <View
@@ -2159,7 +2258,7 @@ export default function AdminDashboardScreen({
                           backgroundColor: r.isExempt ? '#F3E8FF' : '#FFF7ED',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          marginRight: 12,
+                          marginRight: 10,
                           borderWidth: 1,
                           borderColor: r.isExempt ? '#E9D5FF' : '#FED7AA',
                         }}
@@ -2174,6 +2273,23 @@ export default function AdminDashboardScreen({
                           {r.roomNumber}
                         </Text>
                       </View>
+
+                      {/* Resident Profile Picture (if uploaded) */}
+                      {r.profilePictureUrl ? (
+                        <Image
+                          source={{ uri: r.profilePictureUrl }}
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            marginRight: 10,
+                            borderWidth: 1.5,
+                            borderColor: '#FED7AA',
+                            backgroundColor: '#F1F5F9',
+                          }}
+                          resizeMode="cover"
+                        />
+                      ) : null}
 
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -3403,21 +3519,37 @@ export default function AdminDashboardScreen({
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <View
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 22,
-                          backgroundColor: '#FFF7ED',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginRight: 12,
-                          borderWidth: 1,
-                          borderColor: '#FED7AA',
-                        }}
-                      >
-                        <Ionicons name="person" size={22} color="#F57C00" />
-                      </View>
+                      {selectedRoomDetail.residentData?.profilePictureUrl || selectedRoomDetail?.profilePictureUrl ? (
+                        <Image
+                          source={{ uri: selectedRoomDetail.residentData?.profilePictureUrl || selectedRoomDetail.profilePictureUrl }}
+                          style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 24,
+                            marginRight: 12,
+                            borderWidth: 2,
+                            borderColor: '#F57C00',
+                            backgroundColor: '#F1F5F9',
+                          }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
+                            backgroundColor: '#FFF7ED',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: 12,
+                            borderWidth: 1,
+                            borderColor: '#FED7AA',
+                          }}
+                        >
+                          <Ionicons name="person" size={22} color="#F57C00" />
+                        </View>
+                      )}
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
                           {selectedRoomDetail.residentData.name}

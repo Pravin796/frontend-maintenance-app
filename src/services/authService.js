@@ -20,6 +20,7 @@ export const authService = {
         mobileNumber: data.mobileNumber,
         role: data.role,
         mustChangePassword: data.mustChangePassword,
+        profilePictureUrl: data.profilePictureUrl || null,
       };
       await tokenStorage.saveAuth(data.token, user);
     }

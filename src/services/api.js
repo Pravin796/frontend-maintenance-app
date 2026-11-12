@@ -99,6 +99,76 @@ export const getUserDashboard = async () => {
   return response.data;
 };
 
+export const getMyProfile = async () => {
+  const response = await api.get('/users/me');
+  return response.data;
+};
+
+export const uploadProfilePicture = async (uri) => {
+  const formData = new FormData();
+  const rawFilename = uri.split('/').pop() || 'profile.jpg';
+  const filename = rawFilename.includes('.') ? rawFilename : `${rawFilename}.jpg`;
+  const match = /\.(\w+)$/.exec(filename);
+  const ext = match ? match[1].toLowerCase() : 'jpg';
+  let type = 'image/jpeg';
+  if (ext === 'png') type = 'image/png';
+  else if (ext === 'webp') type = 'image/webp';
+  else if (ext === 'gif') type = 'image/gif';
+
+  formData.append('file', {
+    uri,
+    name: filename,
+    type,
+  });
+
+  const token = await tokenStorage.getToken();
+  const uploadUrl = `${ENV.API_URL}/users/me/profile-picture`;
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', uploadUrl);
+    xhr.timeout = 60000;
+
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+
+    xhr.onload = () => {
+      let data;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = { message: xhr.responseText };
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const error = new Error(
+          data?.message || `Profile picture upload failed with status ${xhr.status}`
+        );
+        error.response = { status: xhr.status, data };
+        reject(error);
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network error during profile picture upload. Please check your connection.'));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('Profile picture upload timed out. Please try again.'));
+    };
+
+    xhr.send(formData);
+  });
+};
+
+export const removeProfilePicture = async () => {
+  const response = await api.delete('/users/me/profile-picture');
+  return response.data;
+};
+
 export const getMyPayments = async () => {
   const response = await api.get('/payments/my');
   return response.data;
@@ -337,6 +407,16 @@ export const getPendingCashRequests = async () => {
   return response.data;
 };
 
+export const getAllCashRequestsAdmin = async () => {
+  const response = await api.get('/cash-payments/admin/all');
+  return response.data;
+};
+
+export const getAllRejectedCashRequests = async () => {
+  const response = await api.get('/cash-payments/admin/rejected');
+  return response.data;
+};
+
 export const verifyCashRequest = async (requestId, payload) => {
   const response = await api.post(`/cash-payments/${requestId}/verify`, payload);
   return response.data;
@@ -369,6 +449,16 @@ export const getPendingOnlinePayments = async () => {
 
 export const getVerifiedPayments = async () => {
   const response = await api.get('/payments/admin/verified');
+  return response.data;
+};
+
+export const getAllPaymentsAdmin = async () => {
+  const response = await api.get('/payments/admin/all');
+  return response.data;
+};
+
+export const getAllRejectedPayments = async () => {
+  const response = await api.get('/payments/admin/rejected');
   return response.data;
 };
 
@@ -479,12 +569,16 @@ export const resetResidentPassword = async (userId) => {
 export const adminApi = {
   getAdminDashboard,
   getPendingCashRequests,
+  getAllCashRequestsAdmin,
+  getAllRejectedCashRequests,
   verifyCashRequest,
   rejectCashRequest,
   getCashRequestById,
   getCashRequestsByRoom,
   getPendingOnlinePayments,
   getVerifiedPayments,
+  getAllPaymentsAdmin,
+  getAllRejectedPayments,
   verifyOnlinePayment,
   rejectOnlinePayment,
   getPaymentById,

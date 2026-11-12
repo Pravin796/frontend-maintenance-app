@@ -11,10 +11,12 @@ import {
   useWindowDimensions,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import {
   HeroGradientCard,
   StatusTag,
@@ -25,12 +27,25 @@ import {
 import PaymentScreen from './PaymentScreen';
 import OnlinePaymentScreen from './OnlinePaymentScreen';
 import CashPaymentScreen from './CashPaymentScreen';
-import { getUserDashboard, getMyPayments, getMyMaintenance } from '../src/services/api';
+import {
+  getUserDashboard,
+  getMyPayments,
+  getMyMaintenance,
+  uploadProfilePicture,
+  removeProfilePicture,
+} from '../src/services/api';
+import { authService } from '../src/services/authService';
 import { confirmAction } from '../src/utils/alert';
 
 const TAB_ORDER = ['home', 'payments', 'history', 'profile'];
 
-export default function DashboardScreen({ user, onLogout, onChangePassword, onNavigateAdmin }) {
+export default function DashboardScreen({
+  user,
+  onLogout,
+  onChangePassword,
+  onNavigateAdmin,
+  onUpdateUser,
+}) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -156,7 +171,119 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
   const currentMaintenance = dashboardData?.currentMaintenance || null;
   const recentPayment = dashboardData?.recentPayment || null;
 
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const profilePictureUrl = user?.profilePictureUrl || dashboardData?.profilePictureUrl || null;
 
+  const handlePickProfilePicture = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Needed',
+          'Please allow photo library access to choose your profile photo.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedUri = result.assets[0].uri;
+        setIsUploadingPhoto(true);
+
+        try {
+          const res = await uploadProfilePicture(selectedUri);
+          const newPhotoUrl = res?.profilePictureUrl;
+
+          // Update local dashboardData
+          setDashboardData((prev) => (prev ? { ...prev, profilePictureUrl: newPhotoUrl } : prev));
+
+          // Update stored user
+          const currentUser = await authService.getCurrentUser();
+          if (currentUser) {
+            const updated = { ...currentUser, profilePictureUrl: newPhotoUrl };
+            await authService.updateStoredUser(updated);
+            if (onUpdateUser) {
+              onUpdateUser(updated);
+            }
+          }
+
+          Alert.alert('Profile Photo Updated', 'Your profile picture has been updated successfully.');
+        } catch (err) {
+          console.warn('Profile photo upload failed:', err);
+          Alert.alert(
+            'Upload Failed',
+            err?.response?.data?.message || err?.message || 'Unable to upload profile photo.'
+          );
+        } finally {
+          setIsUploadingPhoto(false);
+        }
+      }
+    } catch {
+      Alert.alert('Selection Error', 'Could not open photo library.');
+    }
+  };
+
+  const handleRemoveProfilePicture = async () => {
+    Alert.alert(
+      'Remove Photo',
+      'Are you sure you want to remove your profile picture?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setIsUploadingPhoto(true);
+            try {
+              await removeProfilePicture();
+              setDashboardData((prev) => (prev ? { ...prev, profilePictureUrl: null } : prev));
+
+              const currentUser = await authService.getCurrentUser();
+              if (currentUser) {
+                const updated = { ...currentUser, profilePictureUrl: null };
+                await authService.updateStoredUser(updated);
+                if (onUpdateUser) {
+                  onUpdateUser(updated);
+                }
+              }
+
+              Alert.alert('Photo Removed', 'Your profile picture has been removed.');
+            } catch (err) {
+              console.warn('Remove photo failed:', err);
+              Alert.alert(
+                'Remove Failed',
+                err?.response?.data?.message || err?.message || 'Unable to remove profile picture.'
+              );
+            } finally {
+              setIsUploadingPhoto(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleAvatarPress = () => {
+    if (profilePictureUrl) {
+      Alert.alert(
+        'Profile Picture',
+        'Choose an action for your profile picture',
+        [
+          { text: 'Change Photo', onPress: handlePickProfilePicture },
+          { text: 'Remove Photo', style: 'destructive', onPress: handleRemoveProfilePicture },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    } else {
+      handlePickProfilePicture();
+    }
+  };
 
   const isPaymentLocked = Boolean(dashboardData?.pendingPayment);
 
@@ -232,7 +359,9 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
           ...user,
           fullName: userName,
           roomNumber,
+          profilePictureUrl,
         }}
+        avatarSource={profilePictureUrl ? { uri: profilePictureUrl } : undefined}
         activeTab={activeTab}
         title={
           activeTab === 'payments' && paymentSubView === 'online'
@@ -979,19 +1108,82 @@ export default function DashboardScreen({ user, onLogout, onChangePassword, onNa
                   elevation: 1.5,
                 }}
               >
-                <View
+                {/* Profile Photo Avatar with Edit/Camera Button Overlay */}
+                <TouchableOpacity
+                  onPress={handleAvatarPress}
+                  activeOpacity={0.85}
+                  disabled={isUploadingPhoto}
                   style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: 36,
-                    backgroundColor: '#FFF2E8',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 12,
+                    position: 'relative',
+                    marginBottom: 10,
                   }}
                 >
-                  <Ionicons name="person" size={36} color="#F57C00" />
-                </View>
+                  <View
+                    style={{
+                      width: 90,
+                      height: 90,
+                      borderRadius: 45,
+                      backgroundColor: '#FFF2E8',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 3,
+                      borderColor: '#FED7AA',
+                      overflow: 'hidden',
+                      shadowColor: '#F57C00',
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 6,
+                      elevation: 3,
+                    }}
+                  >
+                    {isUploadingPhoto ? (
+                      <ActivityIndicator size="small" color="#F57C00" />
+                    ) : profilePictureUrl ? (
+                      <Image
+                        source={{ uri: profilePictureUrl }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Ionicons name="person" size={44} color="#F57C00" />
+                    )}
+                  </View>
+
+                  {/* Camera icon badge overlay */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      backgroundColor: '#F57C00',
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 2,
+                      borderColor: '#FFFFFF',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 2,
+                      elevation: 2,
+                    }}
+                  >
+                    <Ionicons name="camera" size={14} color="#FFFFFF" />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Subtext under avatar indicating tap-to-change */}
+                <TouchableOpacity
+                  onPress={handleAvatarPress}
+                  disabled={isUploadingPhoto}
+                  style={{ marginBottom: 12 }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#EA580C' }}>
+                    {isUploadingPhoto ? 'Uploading Photo...' : profilePictureUrl ? 'Change Profile Photo' : 'Upload Profile Photo'}
+                  </Text>
+                </TouchableOpacity>
                 <Text style={{ fontSize: 18, fontWeight: '700', color: '#1E293B' }}>{userName}</Text>
                 <Text style={{ fontSize: 14, color: '#64748B', marginTop: 2 }}>
                   Room {roomNumber} • {user?.role || 'Resident'}

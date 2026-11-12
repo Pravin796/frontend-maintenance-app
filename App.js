@@ -137,6 +137,7 @@ export default function App() {
                     mobileNumber: userData.mobileNumber,
                     role: userData.role,
                     mustChangePassword: userData.mustChangePassword,
+                    profilePictureUrl: userData.profilePictureUrl || null,
                   };
                   setCurrentUser(user);
                   if (userData.mustChangePassword) {
@@ -228,6 +229,7 @@ export default function App() {
               <DashboardScreen
                 {...props}
                 user={currentUser}
+                onUpdateUser={(updatedUser) => setCurrentUser((prev) => ({ ...prev, ...updatedUser }))}
                 onLogout={handleLogout}
                 onChangePassword={() => props.navigation.navigate('ChangePassword')}
                 onNavigateOnlinePayment={() => props.navigation.navigate('OnlinePayment')}

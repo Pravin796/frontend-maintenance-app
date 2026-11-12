@@ -94,7 +94,21 @@ export default function CashPaymentScreen({
       return;
     }
 
+    const rawOutstanding = parseInt(outstandingAmount.replace(/[^0-9]/g, '') || '0', 10);
+    if (rawOutstanding <= 0) {
+      Alert.alert('No Dues', 'All maintenance dues are cleared. There are no outstanding dues to pay.');
+      return;
+    }
+
     const numAmount = Number(trimmed);
+    if (numAmount > rawOutstanding) {
+      Alert.alert(
+        'Amount Exceeds Dues',
+        `Payment amount (₹${numAmount.toLocaleString('en-IN')}) cannot exceed outstanding dues of ₹${rawOutstanding.toLocaleString('en-IN')}.`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -375,39 +389,45 @@ export default function CashPaymentScreen({
         </View>
 
         {/* Submit Cash Payment Button */}
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={isSubmitting || isPaymentLocked}
-          activeOpacity={0.85}
-          style={{
-            backgroundColor: isPaymentLocked ? '#CBD5E1' : '#F57C00',
-            borderRadius: 14,
-            paddingVertical: 14,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            shadowColor: isPaymentLocked ? 'transparent' : '#F57C00',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: isPaymentLocked ? 0 : 0.28,
-            shadowRadius: 8,
-            elevation: isPaymentLocked ? 0 : 3,
-          }}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-          ) : null}
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 15,
-              fontWeight: '700',
-              marginRight: 6,
-            }}
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Cash Payment'}
-          </Text>
-          {!isSubmitting && <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />}
-        </TouchableOpacity>
+        {(() => {
+          const rawDues = parseInt(outstandingAmount.replace(/[^0-9]/g, '') || '0', 10);
+          const isDisabled = isSubmitting || isPaymentLocked || rawDues <= 0;
+          return (
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={isDisabled}
+              activeOpacity={0.85}
+              style={{
+                backgroundColor: isDisabled ? '#CBD5E1' : '#F57C00',
+                borderRadius: 14,
+                paddingVertical: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: isDisabled ? 'transparent' : '#F57C00',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: isDisabled ? 0 : 0.28,
+                shadowRadius: 8,
+                elevation: isDisabled ? 0 : 3,
+              }}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+              ) : null}
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 15,
+                  fontWeight: '700',
+                  marginRight: 6,
+                }}
+              >
+                {isSubmitting ? 'Submitting...' : rawDues <= 0 ? 'No Dues Pending' : 'Submit Cash Payment'}
+              </Text>
+              {!isSubmitting && <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />}
+            </TouchableOpacity>
+          );
+        })()}
       </View>
 
       {/* 2. Card: How It Works */}

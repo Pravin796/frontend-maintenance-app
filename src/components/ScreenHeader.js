@@ -307,6 +307,7 @@ const ScreenHeader = memo(function ScreenHeader({
               <Image
                 source={
                   avatarSource ||
+                  (user?.profilePictureUrl ? { uri: user.profilePictureUrl } : null) ||
                   (isAdmin
                     ? require('../../assets/admin-avatar.jpg')
                     : require('../../assets/user-avatar.jpg'))

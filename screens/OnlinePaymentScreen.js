@@ -214,34 +214,21 @@ export default function OnlinePaymentScreen({
       return;
     }
 
-    const rawNum = parseInt(outstandingAmount.replace(/[^0-9]/g, '') || '500', 10);
-    const amountToPay = rawNum > 0 ? rawNum : 500;
+    const rawNum = parseInt(outstandingAmount.replace(/[^0-9]/g, '') || '0', 10);
+    if (rawNum <= 0) {
+      Alert.alert('No Dues', 'All maintenance dues are cleared. There are no outstanding dues to pay.');
+      return;
+    }
+    const amountToPay = rawNum;
 
     setIsSubmitting(true);
 
     try {
-      // 1. Create or retrieve active pending payment for room
-      let paymentRes;
-      try {
-        paymentRes = await createPayment({
-          amount: amountToPay,
-          method: 'ONLINE',
-        });
-      } catch (err) {
-        if (err?.response?.data?.message?.includes('already has a pending payment')) {
-          const myPending = await api.get('/payments/my');
-          const existingPending = Array.isArray(myPending.data)
-            ? myPending.data.find((p) => p.status === 'PENDING')
-            : null;
-          if (existingPending) {
-            paymentRes = existingPending;
-          } else {
-            throw err;
-          }
-        } else {
-          throw err;
-        }
-      }
+      // 1. Create a new payment record for the room
+      const paymentRes = await createPayment({
+        amount: amountToPay,
+        method: 'ONLINE',
+      });
 
       // 2. Submit payment proof with UTR and local screenshot as multipart/form-data
       let proofRes = null;
@@ -284,7 +271,8 @@ export default function OnlinePaymentScreen({
     }
   };
 
-  const isSubmitDisabled = isSubmitting || !utrNumber.trim() || !localImageUri || isPaymentLocked;
+  const rawBalance = parseInt(outstandingAmount.replace(/[^0-9]/g, '') || '0', 10);
+  const isSubmitDisabled = isSubmitting || !utrNumber.trim() || !localImageUri || isPaymentLocked || rawBalance <= 0;
 
   return (
     <ScrollView
@@ -1280,9 +1268,9 @@ export default function OnlinePaymentScreen({
                   marginRight: 6,
                 }}
               >
-                Submit for Verification
+                {rawBalance <= 0 ? 'No Dues Pending' : 'Submit for Verification'}
               </Text>
-              <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
+              {rawBalance > 0 && <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />}
             </>
           )}
         </TouchableOpacity>
