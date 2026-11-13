@@ -33,6 +33,7 @@ import {
   getMyMaintenance,
   uploadProfilePicture,
   removeProfilePicture,
+  getUnreadNotificationCount,
 } from '../src/services/api';
 import { authService } from '../src/services/authService';
 import { confirmAction } from '../src/utils/alert';
@@ -51,6 +52,7 @@ export default function DashboardScreen({
 
   const [activeTab, setActiveTab] = useState('home');
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   // Sub-page view state: 'main' | 'online' | 'cash'
   const [paymentSubView, setPaymentSubView] = useState('main');
@@ -85,10 +87,11 @@ export default function DashboardScreen({
     }
     setDashboardError(null);
     try {
-      const [dashRes, paymentsRes, maintRes] = await Promise.allSettled([
+      const [dashRes, paymentsRes, maintRes, unreadRes] = await Promise.allSettled([
         getUserDashboard(),
         getMyPayments(),
         getMyMaintenance(),
+        getUnreadNotificationCount(),
       ]);
 
       if (dashRes.status === 'fulfilled' && dashRes.value) {
@@ -99,6 +102,9 @@ export default function DashboardScreen({
       }
       if (maintRes.status === 'fulfilled' && Array.isArray(maintRes.value)) {
         setMyMaintenance(maintRes.value);
+      }
+      if (unreadRes.status === 'fulfilled' && unreadRes.value) {
+        setUnreadNotifCount(unreadRes.value.unreadCount ?? 0);
       }
 
       if (dashRes.status === 'rejected') {
@@ -379,7 +385,7 @@ export default function DashboardScreen({
         }
         showBack={activeTab === 'payments' && paymentSubView !== 'main'}
         onBack={handleBackToMainPayments}
-        unreadCount={2}
+        unreadCount={unreadNotifCount}
         onPressNotifications={() => setNotificationsVisible(true)}
         onPressAvatar={() => handleTabPress('profile')}
         onPressLogo={() => {
@@ -1286,6 +1292,7 @@ export default function DashboardScreen({
       <NotificationsModal
         visible={notificationsVisible}
         onClose={() => setNotificationsVisible(false)}
+        onUpdateUnreadCount={setUnreadNotifCount}
       />
 
       {/* Animated Bottom Navigation Bar */}

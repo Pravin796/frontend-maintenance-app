@@ -50,6 +50,8 @@ import {
   updateRoomExemption,
   getAllResidents,
   resetResidentPassword,
+  sendAdminNotification,
+  getAdminNotificationHistory,
 } from '../src/services/adminService';
 
 const TAB_ORDER = ['dashboard', 'payments', 'rooms', 'profile'];
@@ -279,6 +281,107 @@ export default function AdminDashboardScreen({
   const [newRoomNumber, setNewRoomNumber] = useState('');
   const [newRoomIsExempt, setNewRoomIsExempt] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+
+  // Admin Notification / Broadcast State
+  const [broadcastModalTab, setBroadcastModalTab] = useState('compose'); // 'compose' | 'history'
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastCategory, setBroadcastCategory] = useState('ANNOUNCEMENT');
+  const [broadcastTargetType, setBroadcastTargetType] = useState('ALL_RESIDENTS'); // 'ALL_RESIDENTS' | 'SPECIFIC_USER'
+  const [broadcastTargetRoom, setBroadcastTargetRoom] = useState(null);
+  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+  const [broadcastHistory, setBroadcastHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  const handleOpenBroadcastModal = (targetRoom = null) => {
+    if (targetRoom) {
+      setBroadcastTargetType('SPECIFIC_USER');
+      setBroadcastTargetRoom(targetRoom);
+    } else {
+      setBroadcastTargetType('ALL_RESIDENTS');
+      setBroadcastTargetRoom(null);
+    }
+    setBroadcastTitle('');
+    setBroadcastMessage('');
+    setBroadcastCategory('ANNOUNCEMENT');
+    setBroadcastModalTab('compose');
+    setNotificationsVisible(true);
+  };
+
+  const handleFetchBroadcastHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      const history = await getAdminNotificationHistory();
+      setBroadcastHistory(Array.isArray(history) ? history : []);
+    } catch (err) {
+      console.warn('Failed to load broadcast history:', err);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleSendBroadcast = async () => {
+    const trimmedTitle = broadcastTitle.trim();
+    const trimmedMessage = broadcastMessage.trim();
+
+    if (!trimmedTitle) {
+      Alert.alert('Missing Title', 'Please enter a notification title.');
+      return;
+    }
+    if (!trimmedMessage) {
+      Alert.alert('Missing Message', 'Please enter a notification message.');
+      return;
+    }
+    if (broadcastTargetType === 'SPECIFIC_USER' && !broadcastTargetRoom) {
+      Alert.alert('Target Room Required', 'Please select a resident room to receive this notification.');
+      return;
+    }
+
+    const targetDesc = broadcastTargetType === 'ALL_RESIDENTS'
+      ? 'all registered residents'
+      : `Room ${broadcastTargetRoom.roomNumber || broadcastTargetRoom.room} (${broadcastTargetRoom.resident || 'Resident'})`;
+
+    Alert.alert(
+      'Push Notification Confirmation',
+      `Dispatch this ${broadcastCategory.toLowerCase()} alert to ${targetDesc}?\n\nThis will trigger an instant push notification on resident devices and post to their notification inbox.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Now',
+          onPress: async () => {
+            setIsSendingBroadcast(true);
+            try {
+              const payload = {
+                title: trimmedTitle,
+                message: trimmedMessage,
+                category: broadcastCategory,
+                targetType: broadcastTargetType,
+                targetRoomId: broadcastTargetType === 'SPECIFIC_USER' && broadcastTargetRoom
+                  ? (broadcastTargetRoom.roomId || broadcastTargetRoom.id || null)
+                  : null,
+                targetUserId: broadcastTargetType === 'SPECIFIC_USER' && broadcastTargetRoom?.residentData
+                  ? broadcastTargetRoom.residentData.id
+                  : null,
+              };
+
+              await sendAdminNotification(payload);
+
+              Alert.alert('Notification Dispatched', `Alert successfully sent to ${targetDesc}!`);
+              setBroadcastTitle('');
+              setBroadcastMessage('');
+              setBroadcastTargetRoom(null);
+              setNotificationsVisible(false);
+            } catch (err) {
+              const msg = err?.response?.data?.message || err?.message || 'Failed to dispatch notification';
+              Alert.alert('Delivery Error', msg);
+            } finally {
+              setIsSendingBroadcast(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const formatDateTime = (isoString) => {
     if (!isoString) return 'Recent';
@@ -1244,6 +1347,75 @@ export default function AdminDashboardScreen({
                   }}
                 />
               </View>
+
+              {/* Broadcast Announcement & Push Notification Quick Card */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleOpenBroadcastModal()}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 20,
+                  padding: 16,
+                  marginBottom: 24,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  shadowColor: '#EA580C',
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 8,
+                  elevation: 2.5,
+                  borderWidth: 1.5,
+                  borderColor: '#FED7AA',
+                }}
+              >
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 16,
+                    backgroundColor: '#FFF7ED',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 14,
+                    borderWidth: 1,
+                    borderColor: '#FED7AA',
+                  }}
+                >
+                  <Ionicons name="megaphone" size={24} color="#EA580C" />
+                </View>
+
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
+                      Push Notification
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: '#EA580C',
+                        borderRadius: 8,
+                        paddingHorizontal: 6,
+                        paddingVertical: 1.5,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF' }}>BROADCAST</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12.5, color: '#64748B', marginTop: 2 }}>
+                    Push instant notice to all residents or specific room
+                  </Text>
+                </View>
+
+                <View
+                  style={{
+                    backgroundColor: '#F57C00',
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 12,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Send</Text>
+                </View>
+              </TouchableOpacity>
 
               {/* Pending Verification Section */}
               <View style={{ marginBottom: 24 }}>
@@ -2485,101 +2657,580 @@ export default function AdminDashboardScreen({
         )}
       </View>
 
-      {/* Notifications Modal */}
+      {/* ADMIN PUSH NOTIFICATIONS & BROADCAST MODAL */}
       <Modal
         visible={notificationsVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setNotificationsVisible(false)}
+        onRequestClose={() => {
+          if (!isSendingBroadcast) setNotificationsVisible(false);
+        }}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'flex-end',
-          }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
         >
           <View
             style={{
-              backgroundColor: '#FFFFFF',
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              padding: 24,
-              maxHeight: '75%',
+              flex: 1,
+              backgroundColor: 'rgba(15, 23, 42, 0.45)',
+              justifyContent: 'flex-end',
             }}
           >
             <View
               style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 18,
+                backgroundColor: '#FFFFFF',
+                borderTopLeftRadius: 32,
+                borderTopRightRadius: 32,
+                maxHeight: '90%',
+                paddingTop: 12,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 16,
+                elevation: 10,
               }}
             >
-              <Text style={{ fontSize: 20, fontWeight: '800', color: '#0F172A' }}>
-                Admin Notifications
-              </Text>
-              <TouchableOpacity onPress={() => setNotificationsVisible(false)}>
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
+              {/* Handle Bar */}
+              <View
+                style={{
+                  width: 44,
+                  height: 4.5,
+                  borderRadius: 3,
+                  backgroundColor: '#CBD5E1',
+                  alignSelf: 'center',
+                  marginBottom: 14,
+                }}
+              />
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ gap: 12, marginBottom: 20 }}>
-                <View
-                  style={{
-                    padding: 14,
-                    borderRadius: 14,
-                    backgroundColor: '#FFF7ED',
-                    borderLeftWidth: 4,
-                    borderLeftColor: '#F57C00',
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#9A3412' }}>
-                    {onlinePendingCount} Online Payments Pending Review
-                  </Text>
-                  <Text style={{ fontSize: 12.5, color: '#C2410C', marginTop: 2 }}>
-                    Residents submitted UPI receipts for October maintenance.
-                  </Text>
+              {/* Header */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingHorizontal: 20,
+                  marginBottom: 14,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: '#FFF7ED',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: 12,
+                      borderWidth: 1.5,
+                      borderColor: '#FED7AA',
+                    }}
+                  >
+                    <Ionicons name="megaphone" size={22} color="#EA580C" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A' }}>
+                      Push Notifications
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                      Broadcast alerts to residents & mobile devices
+                    </Text>
+                  </View>
                 </View>
 
-                <View
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!isSendingBroadcast) setNotificationsVisible(false);
+                  }}
+                  disabled={isSendingBroadcast}
                   style={{
-                    padding: 14,
-                    borderRadius: 14,
-                    backgroundColor: '#FEF3C7',
-                    borderLeftWidth: 4,
-                    borderLeftColor: '#D97706',
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#92400E' }}>
-                    {cashPendingCount} Cash Payment Requests
-                  </Text>
-                  <Text style={{ fontSize: 12.5, color: '#B45309', marginTop: 2 }}>
-                    Cash handed over at security booth awaiting verification.
-                  </Text>
-                </View>
-
-                <View
-                  style={{
-                    padding: 14,
-                    borderRadius: 14,
-                    backgroundColor: '#DCFCE7',
-                    borderLeftWidth: 4,
-                    borderLeftColor: '#16A34A',
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#166534' }}>
-                    October Collection Milestone
-                  </Text>
-                  <Text style={{ fontSize: 12.5, color: '#15803D', marginTop: 2 }}>
-                    45% target reached (₹18,000 collected so far).
-                  </Text>
-                </View>
+                  <Ionicons name="close" size={20} color="#64748B" />
+                </TouchableOpacity>
               </View>
-            </ScrollView>
+
+              {/* Modal Tabs: Compose vs History */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  backgroundColor: '#F1F5F9',
+                  borderRadius: 24,
+                  padding: 4,
+                  marginHorizontal: 20,
+                  marginBottom: 16,
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() => setBroadcastModalTab('compose')}
+                  style={{
+                    flex: 1,
+                    backgroundColor: broadcastModalTab === 'compose' ? '#F57C00' : 'transparent',
+                    borderRadius: 20,
+                    paddingVertical: 7,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: broadcastModalTab === 'compose' ? '#FFFFFF' : '#64748B',
+                    }}
+                  >
+                    📢 Compose & Send
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setBroadcastModalTab('history');
+                    handleFetchBroadcastHistory();
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: broadcastModalTab === 'history' ? '#F57C00' : 'transparent',
+                    borderRadius: 20,
+                    paddingVertical: 7,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: broadcastModalTab === 'history' ? '#FFFFFF' : '#64748B',
+                    }}
+                  >
+                    📜 Sent History
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Tab 1: Compose & Send */}
+              {broadcastModalTab === 'compose' ? (
+                <ScrollView
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 30 }}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {/* Target Audience Selector */}
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 8 }}>
+                    Target Audience *
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setBroadcastTargetType('ALL_RESIDENTS');
+                        setBroadcastTargetRoom(null);
+                      }}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        borderRadius: 14,
+                        borderWidth: 1.5,
+                        borderColor: broadcastTargetType === 'ALL_RESIDENTS' ? '#F57C00' : '#E2E8F0',
+                        backgroundColor: broadcastTargetType === 'ALL_RESIDENTS' ? '#FFF7ED' : '#FFFFFF',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Ionicons
+                        name="people"
+                        size={17}
+                        color={broadcastTargetType === 'ALL_RESIDENTS' ? '#F57C00' : '#64748B'}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: '700',
+                          color: broadcastTargetType === 'ALL_RESIDENTS' ? '#F57C00' : '#475569',
+                        }}
+                      >
+                        All Residents
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setBroadcastTargetType('SPECIFIC_USER')}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        borderRadius: 14,
+                        borderWidth: 1.5,
+                        borderColor: broadcastTargetType === 'SPECIFIC_USER' ? '#F57C00' : '#E2E8F0',
+                        backgroundColor: broadcastTargetType === 'SPECIFIC_USER' ? '#FFF7ED' : '#FFFFFF',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Ionicons
+                        name="home"
+                        size={17}
+                        color={broadcastTargetType === 'SPECIFIC_USER' ? '#F57C00' : '#64748B'}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: '700',
+                          color: broadcastTargetType === 'SPECIFIC_USER' ? '#F57C00' : '#475569',
+                        }}
+                      >
+                        Specific Room
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Room Selector if SPECIFIC_USER */}
+                  {broadcastTargetType === 'SPECIFIC_USER' && (
+                    <View style={{ marginBottom: 16 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748B', marginBottom: 8 }}>
+                        Select Target Room & Resident:
+                      </Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+                      >
+                        {combinedRooms
+                          .filter((r) => r.isOccupied)
+                          .map((r) => {
+                            const isSelected =
+                              broadcastTargetRoom?.room === r.room ||
+                              broadcastTargetRoom?.roomNumber === r.roomNumber;
+
+                            return (
+                              <TouchableOpacity
+                                key={`target-room-${r.id || r.room}`}
+                                onPress={() => setBroadcastTargetRoom(r)}
+                                style={{
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 8,
+                                  borderRadius: 12,
+                                  borderWidth: 1.5,
+                                  borderColor: isSelected ? '#F57C00' : '#E2E8F0',
+                                  backgroundColor: isSelected ? '#FFF7ED' : '#FFFFFF',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: '800',
+                                    color: isSelected ? '#EA580C' : '#1E293B',
+                                  }}
+                                >
+                                  Room {r.room}
+                                </Text>
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    color: isSelected ? '#C2410C' : '#64748B',
+                                    marginTop: 2,
+                                  }}
+                                  numberOfLines={1}
+                                >
+                                  {r.resident || 'Occupied'}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                      </ScrollView>
+                      {broadcastTargetRoom ? (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#F0FDF4',
+                            borderRadius: 10,
+                            padding: 8,
+                            marginTop: 8,
+                            borderWidth: 1,
+                            borderColor: '#DCFCE7',
+                          }}
+                        >
+                          <Ionicons name="checkmark-circle" size={16} color="#16A34A" style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 12, color: '#166534', fontWeight: '600' }}>
+                            Selected: Room {broadcastTargetRoom.room} • {broadcastTargetRoom.resident || 'Resident'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>
+                          * Please tap an occupied room above
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Notification Category */}
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 8 }}>
+                    Category *
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 8, marginBottom: 16 }}
+                  >
+                    {[
+                      { key: 'ANNOUNCEMENT', label: '📢 Notice', color: '#9333EA', bg: '#F3E8FF' },
+                      { key: 'MAINTENANCE', label: '🔧 Maintenance', color: '#D97706', bg: '#FEF3C7' },
+                      { key: 'PAYMENT_REMINDER', label: '💳 Payment Due', color: '#EA580C', bg: '#FFF3E8' },
+                      { key: 'URGENT', label: '🚨 Urgent Alert', color: '#DC2626', bg: '#FEE2E2' },
+                      { key: 'GENERAL', label: '💬 General', color: '#0284C7', bg: '#E0F2FE' },
+                    ].map((cat) => {
+                      const isSelected = broadcastCategory === cat.key;
+                      return (
+                        <TouchableOpacity
+                          key={cat.key}
+                          onPress={() => setBroadcastCategory(cat.key)}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 7,
+                            borderRadius: 12,
+                            borderWidth: 1.5,
+                            borderColor: isSelected ? cat.color : '#E2E8F0',
+                            backgroundColor: isSelected ? cat.bg : '#FFFFFF',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '700',
+                              color: isSelected ? cat.color : '#64748B',
+                            }}
+                          >
+                            {cat.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  {/* Title Input */}
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 6 }}>
+                    Title *
+                  </Text>
+                  <TextInput
+                    value={broadcastTitle}
+                    onChangeText={setBroadcastTitle}
+                    placeholder="e.g. Overhead Water Tank Cleaning"
+                    placeholderTextColor="#94A3B8"
+                    maxLength={100}
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      fontSize: 14,
+                      color: '#0F172A',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      marginBottom: 14,
+                    }}
+                  />
+
+                  {/* Message Input */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B' }}>
+                      Message Body *
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                      {broadcastMessage.length}/500
+                    </Text>
+                  </View>
+                  <TextInput
+                    value={broadcastMessage}
+                    onChangeText={setBroadcastMessage}
+                    placeholder="Enter detailed notice or alert for residents..."
+                    placeholderTextColor="#94A3B8"
+                    multiline
+                    numberOfLines={4}
+                    maxLength={500}
+                    textAlignVertical="top"
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      fontSize: 14,
+                      color: '#0F172A',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      height: 100,
+                      marginBottom: 18,
+                    }}
+                  />
+
+                  {/* Live Notification Preview */}
+                  {broadcastTitle.trim() || broadcastMessage.trim() ? (
+                    <View style={{ marginBottom: 20 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
+                        PREVIEW (RESIDENT LOCK SCREEN & APP)
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: '#FFFDFB',
+                          borderRadius: 16,
+                          padding: 14,
+                          borderWidth: 1.5,
+                          borderColor: '#FED7AA',
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                          <Ionicons name="notifications" size={16} color="#EA580C" style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1 }}>
+                            {broadcastTitle.trim() || 'Notification Title'}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#EA580C', fontWeight: '700' }}>
+                            {broadcastCategory}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 12.5, color: '#475569', lineHeight: 17 }}>
+                          {broadcastMessage.trim() || 'Your message will appear here'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>
+                          Target: {broadcastTargetType === 'ALL_RESIDENTS' ? 'All Residents' : `Room ${broadcastTargetRoom?.room || 'Selected'}`} • Just now
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* Send Button */}
+                  <TouchableOpacity
+                    onPress={handleSendBroadcast}
+                    disabled={isSendingBroadcast}
+                    activeOpacity={0.85}
+                    style={{
+                      backgroundColor: isSendingBroadcast ? '#FED7AA' : '#F57C00',
+                      borderRadius: 16,
+                      paddingVertical: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'row',
+                      gap: 8,
+                      shadowColor: '#F57C00',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 8,
+                      elevation: 3,
+                    }}
+                  >
+                    {isSendingBroadcast ? (
+                      <>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                          Dispatching Push Notification...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Ionicons name="send" size={18} color="#FFFFFF" />
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+                          Send Push Notification Now
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </ScrollView>
+              ) : (
+                /* Tab 2: Sent History */
+                <ScrollView
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 30 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {isLoadingHistory ? (
+                    <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                      <ActivityIndicator size="large" color="#F57C00" />
+                      <Text style={{ marginTop: 10, color: '#64748B', fontSize: 13 }}>
+                        Loading sent announcements...
+                      </Text>
+                    </View>
+                  ) : broadcastHistory.length === 0 ? (
+                    <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                      <Ionicons name="chatbubbles-outline" size={44} color="#CBD5E1" />
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#64748B', marginTop: 10 }}>
+                        No announcements dispatched yet
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                        Notices and push alerts sent to residents will appear here
+                      </Text>
+                    </View>
+                  ) : (
+                    broadcastHistory.map((item) => (
+                      <View
+                        key={`history-${item.id || item.notificationId}`}
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 16,
+                          padding: 14,
+                          marginBottom: 12,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.03,
+                          shadowRadius: 4,
+                          elevation: 1,
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 4,
+                          }}
+                        >
+                          <Text style={{ fontSize: 14.5, fontWeight: '700', color: '#0F172A', flex: 1 }}>
+                            {item.title}
+                          </Text>
+                          <View
+                            style={{
+                              backgroundColor: '#FFF7ED',
+                              paddingHorizontal: 8,
+                              paddingVertical: 2,
+                              borderRadius: 8,
+                            }}
+                          >
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#EA580C' }}>
+                              {item.category || 'ANNOUNCEMENT'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={{ fontSize: 12.5, color: '#475569', lineHeight: 17, marginBottom: 8 }}>
+                          {item.message}
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                            {formatDateTime(item.createdAt)}
+                          </Text>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#64748B' }}>
+                            Target: {item.targetType === 'ALL_RESIDENTS' ? '👥 All Residents' : `🏠 Room ${item.targetRoomNumber || 'Target'}`}
+                          </Text>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </ScrollView>
+              )}
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Activity Detail Modal */}
@@ -3584,6 +4235,33 @@ export default function AdminDashboardScreen({
                         </Text>
                       </View>
                     </View>
+
+                    {/* Send Notice Directly to this Room / Resident */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        const targetRoom = selectedRoomDetail;
+                        setSelectedRoomDetail(null);
+                        handleOpenBroadcastModal(targetRoom);
+                      }}
+                      activeOpacity={0.8}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#FFF7ED',
+                        borderWidth: 1.5,
+                        borderColor: '#FED7AA',
+                        borderRadius: 12,
+                        paddingVertical: 10,
+                        marginBottom: 10,
+                        gap: 8,
+                      }}
+                    >
+                      <Ionicons name="notifications-outline" size={17} color="#EA580C" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#EA580C' }}>
+                        Send Push Notice to Room {selectedRoomDetail.roomNumber || selectedRoomDetail.room}
+                      </Text>
+                    </TouchableOpacity>
 
                     {/* Reset Password Button with 1-Hour Cooldown Protection */}
                     {(() => {

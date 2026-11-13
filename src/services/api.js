@@ -566,6 +566,68 @@ export const resetResidentPassword = async (userId) => {
   return response.data;
 };
 
+/**
+ * Notifications & Push Tokens API
+ */
+export const getMyNotifications = async () => {
+  const response = await api.get('/notifications/my');
+  return response.data;
+};
+
+export const getUnreadNotificationCount = async () => {
+  const response = await api.get('/notifications/unread-count');
+  return response.data;
+};
+
+export const markNotificationAsRead = async (id) => {
+  const response = await api.patch(`/notifications/${id}/read`);
+  return response.data;
+};
+
+export const markAllNotificationsAsRead = async () => {
+  const response = await api.patch('/notifications/mark-all-read');
+  return response.data;
+};
+
+export const registerPushToken = async (pushToken, deviceType) => {
+  const response = await api.post('/notifications/push-token', {
+    pushToken,
+    deviceType,
+  });
+  return response.data;
+};
+
+export const removePushToken = async (pushToken) => {
+  const response = await api.delete('/notifications/push-token', {
+    params: { token: pushToken },
+  });
+  return response.data;
+};
+
+export const sendAdminNotification = async ({
+  title,
+  message,
+  category = 'ANNOUNCEMENT',
+  targetType = 'ALL_RESIDENTS',
+  targetUserId = null,
+  targetRoomId = null,
+}) => {
+  const response = await api.post('/admin/notifications', {
+    title,
+    message,
+    category,
+    targetType,
+    targetUserId,
+    targetRoomId,
+  });
+  return response.data;
+};
+
+export const getAdminNotificationHistory = async () => {
+  const response = await api.get('/admin/notifications');
+  return response.data;
+};
+
 export const adminApi = {
   getAdminDashboard,
   getPendingCashRequests,
@@ -597,5 +659,7 @@ export const adminApi = {
   getAllResidents,
   getResidentByRoomId,
   resetResidentPassword,
+  sendAdminNotification,
+  getAdminNotificationHistory,
 };
 

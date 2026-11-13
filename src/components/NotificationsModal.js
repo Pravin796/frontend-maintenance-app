@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -6,92 +6,141 @@ import {
   Modal,
   ScrollView,
   TouchableWithoutFeedback,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  getMyNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+} from '../services/api';
 
 /**
- * Default notification items matching the user's design screenshot
+ * Visual styling configuration for each notification category
  */
-const DEFAULT_NOTIFICATIONS = [
-  {
-    id: 'notif-1',
-    title: 'Payment Verified',
-    message: 'Your payment of ₹500 for September 2026 has been verified by the admin.',
-    time: 'Oct 5, 2025 • 10:24 AM',
-    unread: true,
-    icon: 'card-outline',
-    iconColor: '#EA580C',
-    iconBg: '#FFF3E8',
-  },
-  {
-    id: 'notif-2',
-    title: 'Monthly Maintenance Due',
-    message: 'Your October 2026 maintenance bill is due. Amount: ₹500.',
-    time: 'Oct 3, 2025 • 04:12 PM',
-    unread: true,
-    icon: 'calendar-outline',
-    iconColor: '#D97706',
-    iconBg: '#FEF3C7',
-  },
-  {
-    id: 'notif-3',
-    title: 'Payment Request',
-    message: 'You have submitted a payment request for October 2025. It is under review.',
-    time: 'Oct 2, 2025 • 11:45 AM',
-    unread: true,
-    icon: 'document-text-outline',
-    iconColor: '#0284C7',
-    iconBg: '#E0F2FE',
-  },
-  {
-    id: 'notif-4',
-    title: 'Admin Announcement',
-    message: 'Water supply will be temporarily closed on Oct 8, 2025 from 10 AM to 2 PM.',
-    time: 'Oct 1, 2025 • 06:20 PM',
-    unread: false,
+const CATEGORY_STYLES = {
+  ANNOUNCEMENT: {
     icon: 'megaphone-outline',
     iconColor: '#9333EA',
     iconBg: '#F3E8FF',
+    badgeText: 'Announcement',
   },
-  {
-    id: 'notif-5',
-    title: 'Payment Allocated',
-    message: 'Your payment has been allocated towards October 2025 maintenance.',
-    time: 'Sep 28, 2025 • 09:15 AM',
-    unread: false,
-    icon: 'checkmark-circle',
-    iconColor: '#16A34A',
-    iconBg: '#DCFCE7',
-  },
-  {
-    id: 'notif-6',
-    title: 'Cash Payment Request',
-    message: 'Your cash payment request for ₹1000 is under verification.',
-    time: 'Sep 27, 2025 • 03:32 PM',
-    unread: false,
-    icon: 'time-outline',
+  MAINTENANCE: {
+    icon: 'construct-outline',
     iconColor: '#D97706',
     iconBg: '#FEF3C7',
+    badgeText: 'Maintenance',
   },
-];
+  PAYMENT_REMINDER: {
+    icon: 'card-outline',
+    iconColor: '#EA580C',
+    iconBg: '#FFF3E8',
+    badgeText: 'Payment',
+  },
+  URGENT: {
+    icon: 'alert-circle-outline',
+    iconColor: '#DC2626',
+    iconBg: '#FEE2E2',
+    badgeText: 'Urgent',
+  },
+  GENERAL: {
+    icon: 'notifications-outline',
+    iconColor: '#0284C7',
+    iconBg: '#E0F2FE',
+    badgeText: 'General',
+  },
+};
+
+const formatNotificationTime = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    return (
+      d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }) +
+      ' • ' +
+      d.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+    );
+  } catch {
+    return String(dateStr);
+  }
+};
 
 /**
  * NotificationsModal
- * Matches the user's provided design:
- * - Rounded bottom sheet with grab handle
- * - Header with orange squircle bell icon and '• X Unread' pill badge
- * - Segmented tabs: All (count), Unread (count), Read (count)
- * - Themed notification cards with icon squircles, status badges, and timestamp
- * - Informational notice banner at the bottom
+ * Displays live announcements and notifications from the admin with:
+ * - Real-time unread/read tracking and persistent sync with backend
+ * - Category-specific badge, icon colors and squircle styling
+ * - Tabbed filtering (All / Unread / Read)
+ * - Pull to refresh and "Mark All as Read" action
  */
 const NotificationsModal = memo(function NotificationsModal({
   visible,
   onClose,
-  initialNotifications = DEFAULT_NOTIFICATIONS,
   onNotificationPress,
+  onUpdateUnreadCount,
 }) {
   const [filter, setFilter] = useState('all'); // 'all' | 'unread' | 'read'
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchLiveNotifications = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      const data = await getMyNotifications();
+      const mapped = (data || []).map((item) => {
+        const cat = item.category || 'ANNOUNCEMENT';
+        const styleConfig = CATEGORY_STYLES[cat] || CATEGORY_STYLES.ANNOUNCEMENT;
+
+        return {
+          id: String(item.id || item.notificationId),
+          notificationId: item.notificationId || item.id,
+          title: item.title,
+          message: item.message,
+          category: cat,
+          unread: !item.isRead,
+          time: formatNotificationTime(item.createdAt),
+          icon: styleConfig.icon,
+          iconColor: styleConfig.iconColor,
+          iconBg: styleConfig.iconBg,
+          badgeText: styleConfig.badgeText,
+          targetRoomNumber: item.targetRoomNumber,
+        };
+      });
+
+      setNotifications(mapped);
+
+      const unread = mapped.filter((n) => n.unread).length;
+      if (typeof onUpdateUnreadCount === 'function') {
+        onUpdateUnreadCount(unread);
+      }
+    } catch (err) {
+      console.warn('Failed to load notifications:', err?.message || err);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [onUpdateUnreadCount]);
+
+  useEffect(() => {
+    if (visible) {
+      fetchLiveNotifications(false);
+    }
+  }, [visible, fetchLiveNotifications]);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
   const readCount = notifications.filter((n) => !n.unread).length;
@@ -103,14 +152,36 @@ const NotificationsModal = memo(function NotificationsModal({
     return true;
   });
 
-  const handleCardPress = (item) => {
+  const handleCardPress = async (item) => {
     if (item.unread) {
+      // Optimistic update
       setNotifications((prev) =>
         prev.map((n) => (n.id === item.id ? { ...n, unread: false } : n))
       );
+      if (typeof onUpdateUnreadCount === 'function') {
+        onUpdateUnreadCount(Math.max(0, unreadCount - 1));
+      }
+      try {
+        await markNotificationAsRead(item.notificationId);
+      } catch (err) {
+        console.warn('Failed to mark notification as read:', err);
+      }
     }
     if (onNotificationPress) {
       onNotificationPress(item);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (unreadCount === 0) return;
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    if (typeof onUpdateUnreadCount === 'function') {
+      onUpdateUnreadCount(0);
+    }
+    try {
+      await markAllNotificationsAsRead();
+    } catch (err) {
+      console.warn('Failed to mark all as read:', err);
     }
   };
 
@@ -206,41 +277,59 @@ const NotificationsModal = memo(function NotificationsModal({
                         fontWeight: '500',
                       }}
                     >
-                      Stay updated with the latest information
+                      Stay updated with society notices
                     </Text>
                   </View>
                 </View>
 
-                {/* Right: Unread Count Badge */}
-                <View
-                  style={{
-                    backgroundColor: '#FFF3E8',
-                    borderRadius: 20,
-                    paddingHorizontal: 11,
-                    paddingVertical: 5.5,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginLeft: 8,
-                  }}
-                >
+                {/* Right: Unread Count Badge & Mark All Read */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {unreadCount > 0 && (
+                    <TouchableOpacity
+                      onPress={handleMarkAllAsRead}
+                      activeOpacity={0.7}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 12,
+                        backgroundColor: '#F1F5F9',
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B' }}>
+                        Mark all read
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
                   <View
                     style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: '#EA580C',
-                      marginRight: 6,
-                    }}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '700',
-                      color: '#EA580C',
+                      backgroundColor: '#FFF3E8',
+                      borderRadius: 20,
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      flexDirection: 'row',
+                      alignItems: 'center',
                     }}
                   >
-                    {unreadCount} Unread
-                  </Text>
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: '#EA580C',
+                        marginRight: 5,
+                      }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: '#EA580C',
+                      }}
+                    >
+                      {unreadCount} Unread
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -398,190 +487,227 @@ const NotificationsModal = memo(function NotificationsModal({
               </View>
 
               {/* Notifications List */}
-              <ScrollView
-                contentContainerStyle={{
-                  paddingHorizontal: 20,
-                  paddingBottom: 24,
-                }}
-                showsVerticalScrollIndicator={false}
-              >
-                {filteredNotifications.length === 0 ? (
-                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                    <Ionicons name="notifications-off-outline" size={42} color="#CBD5E1" />
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: '600',
-                        color: '#64748B',
-                        marginTop: 10,
-                      }}
-                    >
-                      No {filter} notifications
-                    </Text>
-                  </View>
-                ) : (
-                  filteredNotifications.map((item) => {
-                    const isUnread = item.unread;
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        onPress={() => handleCardPress(item)}
-                        activeOpacity={0.75}
-                        style={{
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: 18,
-                          padding: 14,
-                          marginBottom: 12,
-                          borderWidth: 1,
-                          borderColor: isUnread ? '#FED7AA' : '#F1F5F9',
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: isUnread ? 0.04 : 0.02,
-                          shadowRadius: 4,
-                          elevation: 1.5,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                        }}
-                      >
-                        {/* Themed Icon Squircle */}
-                        <View
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 14,
-                            backgroundColor: item.iconBg,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginRight: 12,
-                          }}
-                        >
-                          <Ionicons name={item.icon} size={22} color={item.iconColor} />
-                        </View>
-
-                        {/* Content: Title, Description, Timestamp */}
-                        <View style={{ flex: 1, marginRight: 8 }}>
-                          {/* Top Row: Title + Status Badge */}
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              marginBottom: 3,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 14.5,
-                                fontWeight: '700',
-                                color: '#0F172A',
-                                flex: 1,
-                                marginRight: 6,
-                              }}
-                            >
-                              {item.title}
-                            </Text>
-
-                            {/* Pill Badge */}
-                            <View
-                              style={{
-                                backgroundColor: isUnread ? '#FFF3E8' : '#F1F5F9',
-                                paddingHorizontal: 8,
-                                paddingVertical: 2.5,
-                                borderRadius: 10,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                              }}
-                            >
-                              <View
-                                style={{
-                                  width: 5,
-                                  height: 5,
-                                  borderRadius: 2.5,
-                                  backgroundColor: isUnread ? '#EA580C' : '#64748B',
-                                  marginRight: 5,
-                                }}
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 10.5,
-                                  fontWeight: '700',
-                                  color: isUnread ? '#EA580C' : '#64748B',
-                                }}
-                              >
-                                {isUnread ? 'Unread' : 'Read'}
-                              </Text>
-                            </View>
-                          </View>
-
-                          {/* Description */}
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              color: '#64748B',
-                              lineHeight: 16.5,
-                              marginBottom: 6,
-                            }}
-                          >
-                            {item.message}
-                          </Text>
-
-                          {/* Timestamp with Clock Icon */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="time-outline" size={13} color="#94A3B8" />
-                            <Text
-                              style={{
-                                fontSize: 11,
-                                color: '#94A3B8',
-                                marginLeft: 4,
-                                fontWeight: '500',
-                              }}
-                            >
-                              {item.time}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* Right Chevron */}
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                      </TouchableOpacity>
-                    );
-                  })
-                )}
-
-                {/* Bottom Notice Banner */}
-                <View
-                  style={{
-                    backgroundColor: '#FFF7ED',
-                    borderRadius: 14,
-                    padding: 12,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginTop: 4,
-                    marginBottom: 16,
-                    borderWidth: 1,
-                    borderColor: '#FED7AA',
-                  }}
-                >
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={18}
-                    color="#EA580C"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 11.5,
-                      color: '#9A3412',
-                      lineHeight: 16,
-                      flex: 1,
-                      fontWeight: '400',
-                    }}
-                  >
-                    Notifications are automatically marked as read when you view them.
+              {isLoading && !isRefreshing ? (
+                <View style={{ paddingVertical: 50, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#F57C00" />
+                  <Text style={{ marginTop: 12, color: '#64748B', fontSize: 13 }}>
+                    Loading notifications...
                   </Text>
                 </View>
-              </ScrollView>
+              ) : (
+                <ScrollView
+                  contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingBottom: 24,
+                  }}
+                  showsVerticalScrollIndicator={false}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={isRefreshing}
+                      onRefresh={() => fetchLiveNotifications(true)}
+                      colors={['#F57C00']}
+                      tintColor="#F57C00"
+                    />
+                  }
+                >
+                  {filteredNotifications.length === 0 ? (
+                    <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                      <Ionicons name="notifications-off-outline" size={42} color="#CBD5E1" />
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '600',
+                          color: '#64748B',
+                          marginTop: 10,
+                        }}
+                      >
+                        No {filter === 'all' ? '' : filter} notifications
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                        New announcements from administration will appear here
+                      </Text>
+                    </View>
+                  ) : (
+                    filteredNotifications.map((item) => {
+                      const isUnread = item.unread;
+
+                      return (
+                        <TouchableOpacity
+                          key={item.id}
+                          onPress={() => handleCardPress(item)}
+                          activeOpacity={0.75}
+                          style={{
+                            backgroundColor: isUnread ? '#FFFDFB' : '#FFFFFF',
+                            borderRadius: 18,
+                            padding: 14,
+                            marginBottom: 12,
+                            borderWidth: 1,
+                            borderColor: isUnread ? '#FED7AA' : '#F1F5F9',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: isUnread ? 0.05 : 0.02,
+                            shadowRadius: 4,
+                            elevation: 1.5,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                          }}
+                        >
+                          {/* Themed Icon Squircle */}
+                          <View
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 14,
+                              backgroundColor: item.iconBg,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 12,
+                            }}
+                          >
+                            <Ionicons name={item.icon} size={22} color={item.iconColor} />
+                          </View>
+
+                          {/* Content: Title, Description, Timestamp */}
+                          <View style={{ flex: 1, marginRight: 8 }}>
+                            {/* Top Row: Title + Category Pill */}
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: 3,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 14.5,
+                                  fontWeight: isUnread ? '700' : '600',
+                                  color: '#0F172A',
+                                  flex: 1,
+                                  marginRight: 6,
+                                }}
+                              >
+                                {item.title}
+                              </Text>
+
+                              {/* Status Badge */}
+                              <View
+                                style={{
+                                  backgroundColor: isUnread ? '#FFF3E8' : '#F1F5F9',
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 2.5,
+                                  borderRadius: 10,
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: 2.5,
+                                    backgroundColor: isUnread ? '#EA580C' : '#64748B',
+                                    marginRight: 5,
+                                  }}
+                                />
+                                <Text
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: '700',
+                                    color: isUnread ? '#EA580C' : '#64748B',
+                                  }}
+                                >
+                                  {isUnread ? 'Unread' : 'Read'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Description */}
+                            <Text
+                              style={{
+                                fontSize: 12.5,
+                                color: '#475569',
+                                lineHeight: 17,
+                                marginBottom: 6,
+                              }}
+                            >
+                              {item.message}
+                            </Text>
+
+                            {/* Timestamp & Target Room (if targeted) */}
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="time-outline" size={13} color="#94A3B8" />
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    color: '#94A3B8',
+                                    marginLeft: 4,
+                                    fontWeight: '500',
+                                  }}
+                                >
+                                  {item.time}
+                                </Text>
+                              </View>
+
+                              {item.targetRoomNumber ? (
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    color: '#EA580C',
+                                    fontWeight: '600',
+                                  }}
+                                >
+                                  Room {item.targetRoomNumber}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+
+                  {/* Bottom Notice Banner */}
+                  <View
+                    style={{
+                      backgroundColor: '#FFF7ED',
+                      borderRadius: 14,
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginTop: 4,
+                      marginBottom: 16,
+                      borderWidth: 1,
+                      borderColor: '#FED7AA',
+                    }}
+                  >
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={18}
+                      color="#EA580C"
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        color: '#9A3412',
+                        lineHeight: 16,
+                        flex: 1,
+                        fontWeight: '400',
+                      }}
+                    >
+                      Important society notices, water supply schedules, and payment alerts are posted here.
+                    </Text>
+                  </View>
+                </ScrollView>
+              )}
             </View>
           </TouchableWithoutFeedback>
         </View>

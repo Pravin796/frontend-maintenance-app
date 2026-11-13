@@ -29,6 +29,8 @@ import {
   getAllResidents,
   getResidentByRoomId,
   resetResidentPassword,
+  sendAdminNotification,
+  getAdminNotificationHistory,
   adminApi,
 } from './api';
 
@@ -67,6 +69,8 @@ export {
   getAllResidents,
   getResidentByRoomId,
   resetResidentPassword,
+  sendAdminNotification,
+  getAdminNotificationHistory,
   adminApi,
 };
 export default adminService;

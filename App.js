@@ -19,6 +19,7 @@ import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import { Asset } from 'expo-asset';
 import { authService } from './src/services/authService';
 import { setUnauthorizedHandler, setPasswordChangeRequiredHandler } from './src/services/api';
+import { registerForPushNotificationsAsync } from './src/services/notificationService';
 
 const Stack = createNativeStackNavigator();
 
@@ -84,6 +85,12 @@ export default function App() {
 
     initializeApp();
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      registerForPushNotificationsAsync();
+    }
+  }, [currentUser]);
 
   if (isRestoringSession) {
     return (
